@@ -4,6 +4,8 @@ const os = require('os');
 const express = require('express');
 const qrcode = require('qrcode');
 const path = require('path');
+const fs = require('fs');
+const { performance } = require('perf_hooks');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,6 +13,7 @@ const PORT = process.env.PORT || 3000;
 let qrCodeBase64 = '';
 let sock;
 
+// Start bot function
 const startBot = async () => {
   const { state, saveCreds } = await useMultiFileAuthState('auth');
 
@@ -25,9 +28,11 @@ const startBot = async () => {
 
   sock.ev.on('connection.update', async (update) => {
     const { qr, connection, lastDisconnect } = update;
+
     if (qr) {
       qrCodeBase64 = await qrcode.toDataURL(qr);
     }
+
     if (connection === 'close') {
       console.log('Disconnected. Reconnecting...');
       startBot();
@@ -38,29 +43,33 @@ const startBot = async () => {
     const msg = messages[0];
     if (!msg.message || msg.key.fromMe) return;
 
-    const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+    const type = Object.keys(msg.message)[0];
+    const text =
+      msg.message.conversation ||
+      (msg.message.extendedTextMessage && msg.message.extendedTextMessage.text) ||
+      '';
 
-    if (text.startsWith('.menu')) {
+    if (text && text.toLowerCase().startsWith('.menu')) {
       const start = performance.now();
-      await new Promise((res) => setTimeout(res, 200));
+      await new Promise((r) => setTimeout(r, 100));
       const end = performance.now();
+      const speed = (end - start).toFixed(3);
 
-      const speed = (end - start).toFixed(4);
       const usedMemory = process.memoryUsage().heapUsed / 1024 / 1024;
       const totalMemory = os.totalmem() / 1024 / 1024;
       const ramPercentage = ((usedMemory / totalMemory) * 100).toFixed(0);
 
       const menu = `
-┏▣ ◈ CYPHER-X ◈
-┃ ᴏᴡɴᴇʀ : Not Set!
-┃ ᴘʀᴇғɪx : [ . ]
-┃ ʜᴏsᴛ : Render
-┃ ᴘʟᴜɢɪɴs : 309
-┃ ᴍᴏᴅᴇ : Private
-┃ ᴠᴇʀsɪᴏɴ : 1.7.8
-┃ sᴘᴇᴇᴅ : ${speed} ms
-┃ ᴜsᴀɢᴇ : ${usedMemory.toFixed(2)} MB of ${totalMemory.toFixed(0)} MB
-┃ ʀᴀᴍ: [${'█'.repeat(ramPercentage / 10)}${'░'.repeat(10 - ramPercentage / 10)}] ${ramPercentage}%
+┏▣ ◈ *CYPHER-X* ◈
+┃ *ᴏᴡɴᴇʀ* : Not Set!
+┃ *ᴘʀᴇғɪx* : [ . ]
+┃ *ʜᴏsᴛ* : Render
+┃ *ᴘʟᴜɢɪɴs* : 309
+┃ *ᴍᴏᴅᴇ* : Private
+┃ *ᴠᴇʀsɪᴏɴ* : 1.7.8
+┃ *sᴘᴇᴇᴅ* : ${speed} ms
+┃ *ᴜsᴀɢᴇ* : ${usedMemory.toFixed(2)} MB of ${totalMemory.toFixed(0)} MB
+┃ *ʀᴀᴍ*: [${'█'.repeat(ramPercentage / 10)}${'░'.repeat(10 - ramPercentage / 10)}] ${ramPercentage}%
 ┗▣`;
 
       await sock.sendMessage(msg.key.remoteJid, { text: menu }, { quoted: msg });
@@ -70,27 +79,27 @@ const startBot = async () => {
 
 startBot();
 
-// Serve static frontend
+// Serve frontend (optional)
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Root route → redirect to /qr
+// Root redirect
 app.get('/', (req, res) => {
   res.redirect('/qr');
 });
 
-// QR Code endpoint
+// QR code route
 app.get('/qr', (req, res) => {
-  if (!qrCodeBase64) return res.send('QR not ready yet');
+  if (!qrCodeBase64) return res.send('QR not ready. Wait and refresh.');
   res.send(`
     <html>
-      <head><title>CYPHER-X QR</title></head>
-      <body style="text-align:center;font-family:sans-serif;">
-        <h1>Scan QR to Link WhatsApp</h1>
-        <img src="${qrCodeBase64}" style="width:300px;height:300px"/>
-        <p>Open WhatsApp or WhatsApp Business → Linked Devices → Scan QR</p>
+      <head><title>CYPHER-X - QR Login</title></head>
+      <body style="text-align:center;font-family:sans-serif">
+        <h2>Scan QR Code to Login WhatsApp</h2>
+        <img src="${qrCodeBase64}" width="300" height="300" />
+        <p>Go to WhatsApp → Linked Devices → Scan</p>
       </body>
     </html>
   `);
 });
 
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`✅ Server running at http://localhost:${PORT}`));
