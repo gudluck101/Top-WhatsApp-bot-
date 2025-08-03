@@ -10,17 +10,13 @@ const { performance } = require('perf_hooks');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const SESSIONS = {};
 
-const SESSIONS = {}; // Active user sessions
-
-// Create sessions directory if not exists
 if (!fs.existsSync('./sessions')) fs.mkdirSync('./sessions');
 
-// Hardcoded login credentials
 const USERNAME = 'Topboy';
 const PASSWORD = 'Topboy@151007';
 
-// Middleware setup
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
   secret: 'cypher-x-lock',
@@ -33,7 +29,6 @@ function isAuthenticated(req, res, next) {
   res.redirect('/login');
 }
 
-// Create a new WhatsApp session for the given user
 async function createSession(userId) {
   const sessionPath = path.join(__dirname, 'sessions', userId);
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
@@ -62,7 +57,7 @@ async function createSession(userId) {
       const reason = lastDisconnect?.error?.output?.statusCode;
       console.log(`User ${userId} disconnected: ${reason}`);
       if (reason !== DisconnectReason.loggedOut) {
-        await createSession(userId); // reconnect
+        await createSession(userId);
       } else {
         delete SESSIONS[userId];
       }
@@ -76,14 +71,20 @@ async function createSession(userId) {
 
   sock.ev.on('messages.upsert', async ({ messages }) => {
     const msg = messages[0];
-    if (!msg.message || !msg.key.fromMe) return;
+    if (!msg.message) return;
 
+    const from = msg.key.remoteJid;
+    const sender = msg.key.participant || from;
+
+    const content = msg.message?.ephemeralMessage?.message || msg.message;
     const text =
-      msg.message?.conversation ||
-      msg.message?.extendedTextMessage?.text ||
-      msg.message?.imageMessage?.caption || '';
+      content?.conversation ||
+      content?.extendedTextMessage?.text ||
+      content?.imageMessage?.caption || '';
 
-    if (text && text.toLowerCase().startsWith('.menu')) {
+    if (!text) return;
+
+    if (text.toLowerCase().startsWith('.menu')) {
       const start = performance.now();
       await new Promise(r => setTimeout(r, 100));
       const end = performance.now();
@@ -92,7 +93,6 @@ async function createSession(userId) {
       const usedMemory = process.memoryUsage().heapUsed / 1024 / 1024;
       const totalMemory = os.totalmem() / 1024 / 1024;
       const ramPercentage = ((usedMemory / totalMemory) * 100).toFixed(0);
-
       const bar = `[${'█'.repeat(ramPercentage / 10)}${'░'.repeat(10 - ramPercentage / 10)}] ${ramPercentage}%`;
 
       const menu = `
@@ -108,17 +108,16 @@ async function createSession(userId) {
 ┃ ʀᴀᴍ: ${bar}
 ┗▣
 
-> Menus omitted for brevity... (keep original menus)
-`;
+> Menus omitted for brevity...
+      `;
 
-      await sock.sendMessage(msg.key.remoteJid, { text: menu }, { quoted: msg });
+      await sock.sendMessage(from, { text: menu }, { quoted: msg });
     }
   });
 
   SESSIONS[userId] = { sock, qr: null };
 }
 
-// Login page
 app.get('/login', (req, res) => {
   res.send(`
     <html><body style="text-align:center;font-family:sans-serif">
@@ -132,7 +131,6 @@ app.get('/login', (req, res) => {
   `);
 });
 
-// Handle login
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
   if (username === USERNAME && password === PASSWORD) {
@@ -142,12 +140,10 @@ app.post('/login', (req, res) => {
   res.send('Invalid credentials. <a href="/login">Try again</a>');
 });
 
-// Logout
 app.get('/logout', (req, res) => {
   req.session.destroy(() => res.redirect('/login'));
 });
 
-// Home
 app.get('/', isAuthenticated, (req, res) => {
   res.send(`
     <html><body style="text-align:center;font-family:sans-serif">
@@ -162,7 +158,6 @@ app.get('/', isAuthenticated, (req, res) => {
   `);
 });
 
-// QR Code display
 app.get('/qr', isAuthenticated, async (req, res) => {
   const userId = req.query.id;
   if (!userId) return res.status(400).send('Missing ?id');
@@ -194,7 +189,6 @@ app.get('/qr', isAuthenticated, async (req, res) => {
   `);
 });
 
-// Dashboard
 app.get('/dashboard', isAuthenticated, (req, res) => {
   let html = `
     <html><body style="font-family:sans-serif">
@@ -228,7 +222,6 @@ app.get('/dashboard', isAuthenticated, (req, res) => {
   res.send(html);
 });
 
-// Remove session
 app.post('/remove-user', isAuthenticated, express.urlencoded({ extended: true }), async (req, res) => {
   const userId = req.body.id;
   if (SESSIONS[userId]) {
@@ -242,5 +235,4 @@ app.post('/remove-user', isAuthenticated, express.urlencoded({ extended: true })
   res.redirect('/dashboard');
 });
 
-// Start server
 app.listen(PORT, () => console.log(`✅ Server running at http://localhost:${PORT}`));
