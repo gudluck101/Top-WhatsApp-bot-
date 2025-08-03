@@ -7,6 +7,7 @@ const qrcode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
 const { performance } = require('perf_hooks');
+const { queryHuggingFace } = require('./huggingface');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
