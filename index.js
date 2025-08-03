@@ -3,16 +3,18 @@ const P = require('pino');
 const os = require('os');
 const express = require('express');
 const qrcode = require('qrcode');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 let qrCodeBase64 = '';
+let sock;
 
 const startBot = async () => {
   const { state, saveCreds } = await useMultiFileAuthState('auth');
 
-  const sock = makeWASocket({
+  sock = makeWASocket({
     auth: state,
     logger: P({ level: 'silent' }),
     printQRInTerminal: false,
@@ -22,9 +24,13 @@ const startBot = async () => {
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on('connection.update', async (update) => {
-    const { qr } = update;
+    const { qr, connection, lastDisconnect } = update;
     if (qr) {
       qrCodeBase64 = await qrcode.toDataURL(qr);
+    }
+    if (connection === 'close') {
+      console.log('Disconnected. Reconnecting...');
+      startBot();
     }
   });
 
@@ -64,19 +70,27 @@ const startBot = async () => {
 
 startBot();
 
-// Serve QR to frontend
+// Serve static frontend
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Root route → redirect to /qr
+app.get('/', (req, res) => {
+  res.redirect('/qr');
+});
+
+// QR Code endpoint
 app.get('/qr', (req, res) => {
   if (!qrCodeBase64) return res.send('QR not ready yet');
   res.send(`
     <html>
       <head><title>CYPHER-X QR</title></head>
-      <body style="text-align:center;">
-        <h1>Scan to Login WhatsApp</h1>
-        <img src="${qrCodeBase64}" />
-        <p>Open WhatsApp or WhatsApp Business and scan the QR</p>
+      <body style="text-align:center;font-family:sans-serif;">
+        <h1>Scan QR to Link WhatsApp</h1>
+        <img src="${qrCodeBase64}" style="width:300px;height:300px"/>
+        <p>Open WhatsApp or WhatsApp Business → Linked Devices → Scan QR</p>
       </body>
     </html>
   `);
 });
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
