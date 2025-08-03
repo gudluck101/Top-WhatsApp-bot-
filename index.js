@@ -486,36 +486,45 @@ async function createSession(userId) {
   if (matchedEntry) {
     const [mainCommand] = matchedEntry;
 
-    let model, output = '...';
+    let model = '';
+let payload = {};
 
-    switch (mainCommand) {
-      case 'analyze':
-        model = 'facebook/bart-large-mnli'; // intent analysis
-        break;
-      case 'blackbox':
-        model = 'Salesforce/codet5-base'; // code gen
-        break;
-      case 'generate':
-        model = 'gpt2'; // basic free text generation
-        break;
-      case 'doppleai':
-        model = 'microsoft/DialoGPT-small'; // chatbot-style reply
-        break;
-    }
+switch (mainCommand) {
+  case 'generate':
+    model = 'gpt2';
+    payload = { inputs: userInput };
+    break;
+
+  case 'blackbox':
+    model = 'Salesforce/codegen-350M-multi';
+    payload = { inputs: userInput };
+    break;
+
+  case 'doppleai':
+    model = 'microsoft/DialoGPT-small';
+    payload = { inputs: userInput };
+    break;
+
+  case 'analyze':
+    model = 'bhadresh-savani/bert-base-uncased-emotion';
+    payload = { inputs: userInput };
+    break;
+}
 
     await sock.sendMessage(from, { text: `⏳ *${mainCommand.toUpperCase()}* running...\nInput: ${userInput}` }, { quoted: msg });
 
     const result = await queryHuggingFace(model, userInput);
 
     // Handle various result formats
-    if (Array.isArray(result)) {
-      output = result[0]?.generated_text || JSON.stringify(result);
-    } else if (typeof result === 'object') {
-      output = JSON.stringify(result, null, 2);
-    } else {
-      output = result;
-    }
+    let output = '';
 
+if (Array.isArray(result)) {
+  output = result[0]?.generated_text || result[0]?.label || JSON.stringify(result);
+} else if (typeof result === 'object') {
+  output = result?.generated_text || result?.label || JSON.stringify(result, null, 2);
+} else {
+  output = String(result);
+}
     await sock.sendMessage(from, { text: `🤖 *${mainCommand} Result:*\n${output}` }, { quoted: msg });
   }
     }
