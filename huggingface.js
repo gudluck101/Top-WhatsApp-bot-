@@ -4,10 +4,10 @@ async function queryHuggingFace(model, input) {
   try {
     const response = await axios.post(
       `https://api-inference.huggingface.co/models/${model}`,
-      { inputs: input },
+      input,
       {
         headers: {
-          'Authorization': 'Bearer hf_your_free_token_here', // Optional for public models
+          // No token required for public models
         }
       }
     );
