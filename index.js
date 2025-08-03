@@ -77,9 +77,10 @@ async function createSession(userId) {
     if (!msg.message || !msg.key.fromMe) return;
 
     const text =
-      msg.message.conversation ||
-      (msg.message.extendedTextMessage && msg.message.extendedTextMessage.text) ||
-      '';
+  msg.message?.conversation ||
+  msg.message?.extendedTextMessage?.text ||
+  msg.message?.imageMessage?.caption ||
+  '';
 
     if (text && text.toLowerCase().startsWith('.menu')) {
       const start = performance.now();
