@@ -483,7 +483,18 @@ SESSIONS[userId] = { sock, qr: null };
 
 // LOGIN FORM
 app.get('/login', (req, res) => {
-res.send(  <html><body style="text-align:center;font-family:sans-serif">   <h2>Login to CØÑ$PÏRÅÇ¥-X</h2>   <form method="POST" action="/login">   <input name="username" placeholder="Username" required /><br/>   <input name="password" type="password" placeholder="Password" required /><br/>   <button type="submit">Login</button>   </form>   </body></html>  );
+res.send(`
+  <html>
+    <body style="text-align:center;font-family:sans-serif">
+      <h2>Login to CØÑ$PÏRÅÇ¥-X</h2>
+      <form method="POST" action="/login">
+        <input name="username" placeholder="Username" required /><br/>
+        <input name="password" type="password" placeholder="Password" required /><br/>
+        <button type="submit">Login</button>
+      </form>
+    </body>
+  </html>
+`);
 });
 
 app.post('/login', (req, res) => {
