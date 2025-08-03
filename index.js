@@ -100,7 +100,7 @@ async function createSession(userId) {
 ┃ *ᴍᴏᴅᴇ* : Private
 ┃ *ᴠᴇʀsɪᴏɴ* : 1.7.8
 ┃ *sᴘᴇᴇᴅ* : ${speed} ms
-┃ *ᴜsᴀɢᴇ* : ${usedMemory.toFixed(2)} MB of ${totalMemory.toFixed(0)} GB
+┃ *ᴜsᴀɢᴇ* : ${usedMemory.toFixed(2)} MB of ${totalMemory.toFixed(0)} MB
 ┃ *ʀᴀᴍ*: [${'█'.repeat(ramPercentage / 10)}${'░'.repeat(10 - ramPercentage / 10)}] ${ramPercentage}%
 ┗▣
 
