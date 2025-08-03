@@ -115,7 +115,7 @@ async function createSession(userId) {
 app.get('/login', (req, res) => {
   res.send(`
     <html><body style="text-align:center;font-family:sans-serif">
-      <h2>Login to CYPHER-X</h2>
+      <h2>Login to CØÑ$PÏRÅÇ¥-X</h2>
       <form method="POST" action="/login">
         <input name="username" placeholder="Username" required /><br/>
         <input name="password" type="password" placeholder="Password" required /><br/>
