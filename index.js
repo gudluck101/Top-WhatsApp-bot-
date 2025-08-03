@@ -73,14 +73,18 @@ async function createSession(userId) {
   });
 
   sock.ev.on('messages.upsert', async ({ messages }) => {
-    const msg = messages[0];
-    if (!msg.message || !msg.key.fromMe) return;
+  const msg = messages[0];
+  if (!msg.message) return;
 
-    const text =
-  msg.message?.conversation ||
-  msg.message?.extendedTextMessage?.text ||
-  msg.message?.imageMessage?.caption ||
-  '';
+  const from = msg.key.remoteJid;
+  const isGroup = from.endsWith('@g.us');
+  const isFromMe = msg.key.fromMe;
+
+  const content = msg.message?.conversation ||
+                  msg.message?.extendedTextMessage?.text ||
+                  msg.message?.imageMessage?.caption ||
+                  msg.message?.videoMessage?.caption ||
+                  '';
 
     if (text && text.toLowerCase().startsWith('.menu')) {
       const start = performance.now();
