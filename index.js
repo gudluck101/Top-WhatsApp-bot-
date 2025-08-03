@@ -4,7 +4,6 @@ const os = require('os');
 const express = require('express');
 const qrcode = require('qrcode');
 const path = require('path');
-const fs = require('fs');
 const { performance } = require('perf_hooks');
 
 const app = express();
@@ -13,7 +12,6 @@ const PORT = process.env.PORT || 3000;
 let qrCodeBase64 = '';
 let sock;
 
-// Start bot function
 const startBot = async () => {
   const { state, saveCreds } = await useMultiFileAuthState('auth');
 
@@ -27,7 +25,7 @@ const startBot = async () => {
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on('connection.update', async (update) => {
-    const { qr, connection, lastDisconnect } = update;
+    const { qr, connection } = update;
 
     if (qr) {
       qrCodeBase64 = await qrcode.toDataURL(qr);
@@ -41,7 +39,7 @@ const startBot = async () => {
 
   sock.ev.on('messages.upsert', async ({ messages }) => {
     const msg = messages[0];
-    if (!msg.message || msg.key.fromMe) return;
+    if (!msg.message || !msg.key.fromMe) return; // ✅ Only accept commands from linked device (you)
 
     const type = Object.keys(msg.message)[0];
     const text =
@@ -79,15 +77,13 @@ const startBot = async () => {
 
 startBot();
 
-// Serve frontend (optional)
+// Serve frontend QR code
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Root redirect
 app.get('/', (req, res) => {
   res.redirect('/qr');
 });
 
-// QR code route
 app.get('/qr', (req, res) => {
   if (!qrCodeBase64) return res.send('QR not ready. Wait and refresh.');
   res.send(`
