@@ -58,7 +58,7 @@ SESSIONS[userId].qr = qrData;
 
 if (connection === 'close') {
 const reason = lastDisconnect?.error?.output?.statusCode;
-console.log(User ${userId} disconnected: ${reason});
+console.log(`User ${userId} disconnected: ${reason}`);
 if (reason !== DisconnectReason.loggedOut) {
 createSession(userId); // reconnect
 } else {
