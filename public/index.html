@@ -1,20 +1,22 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Cypher-X QR</title>
+  <meta charset="UTF-8" />
+  <title>CYPHER-X QR Login</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; margin-top: 5em; }
+    a.button {
+      padding: 10px 20px;
+      background: #222;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 5px;
+    }
+  </style>
 </head>
 <body>
-  <h2>Scan to Login WhatsApp</h2>
-  <div id="qrcode">Loading QR...</div>
-
-  <script>
-    async function loadQR() {
-      const res = await fetch('/qr');
-      const html = await res.text();
-      document.getElementById('qrcode').innerHTML = html;
-    }
-
-    setInterval(loadQR, 3000); // Reload every 3 seconds
-  </script>
+  <h1>Welcome to CYPHER-X</h1>
+  <p>Click below to scan the WhatsApp QR code</p>
+  <a class="button" href="/qr">Show QR</a>
 </body>
 </html>
