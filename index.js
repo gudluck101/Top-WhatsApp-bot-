@@ -1,21 +1,26 @@
-const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const P = require('pino');
 const os = require('os');
 const express = require('express');
 const qrcode = require('qrcode');
 const path = require('path');
+const fs = require('fs');
 const { performance } = require('perf_hooks');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-let qrCodeBase64 = '';
-let sock;
+const SESSIONS = {}; // Store sockets & QR codes per user
 
-const startBot = async () => {
-  const { state, saveCreds } = await useMultiFileAuthState('auth');
+// Ensure sessions folder exists
+if (!fs.existsSync('./sessions')) fs.mkdirSync('./sessions');
 
-  sock = makeWASocket({
+// Utility to load or create session
+async function createSession(userId) {
+  const sessionPath = path.join(__dirname, 'sessions', userId);
+  const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
+
+  const sock = makeWASocket({
     auth: state,
     logger: P({ level: 'silent' }),
     printQRInTerminal: false,
@@ -25,21 +30,33 @@ const startBot = async () => {
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on('connection.update', async (update) => {
-    const { qr, connection } = update;
+    const { qr, connection, lastDisconnect } = update;
 
     if (qr) {
-      qrCodeBase64 = await qrcode.toDataURL(qr);
+      qrcode.toDataURL(qr, (err, qrData) => {
+        SESSIONS[userId].qr = qrData;
+      });
     }
 
     if (connection === 'close') {
-      console.log('Disconnected. Reconnecting...');
-      startBot();
+      const reason = lastDisconnect?.error?.output?.statusCode;
+      console.log(`User ${userId} disconnected: ${reason}`);
+      if (reason !== DisconnectReason.loggedOut) {
+        createSession(userId); // reconnect if not logged out
+      } else {
+        delete SESSIONS[userId]; // clean up on logout
+      }
+    }
+
+    if (connection === 'open') {
+      console.log(`✅ User ${userId} connected`);
+      SESSIONS[userId].qr = null; // Clear QR when connected
     }
   });
 
   sock.ev.on('messages.upsert', async ({ messages }) => {
     const msg = messages[0];
-    if (!msg.message || !msg.key.fromMe) return; // ✅ Only accept commands from linked device (you)
+    if (!msg.message || !msg.key.fromMe) return;
 
     const type = Object.keys(msg.message)[0];
     const text =
@@ -59,9 +76,9 @@ const startBot = async () => {
 
       const menu = `
 ┏▣ ◈ *CYPHER-X* ◈
-┃ *ᴏᴡɴᴇʀ* : Not Set!
+┃ *ᴜsᴇʀ* : ${userId}
 ┃ *ᴘʀᴇғɪx* : [ . ]
-┃ *ʜᴏsᴛ* : Render
+┃ *ʜᴏsᴛ* : RenderHost
 ┃ *ᴘʟᴜɢɪɴs* : 309
 ┃ *ᴍᴏᴅᴇ* : Private
 ┃ *ᴠᴇʀsɪᴏɴ* : 1.7.8
@@ -73,26 +90,52 @@ const startBot = async () => {
       await sock.sendMessage(msg.key.remoteJid, { text: menu }, { quoted: msg });
     }
   });
-};
 
-startBot();
+  SESSIONS[userId] = { sock, qr: null };
+}
 
-// Serve frontend QR code
-app.use(express.static(path.join(__dirname, 'public')));
-
+// Route: Home → Enter userId
 app.get('/', (req, res) => {
-  res.redirect('/qr');
-});
-
-app.get('/qr', (req, res) => {
-  if (!qrCodeBase64) return res.send('QR not ready. Wait and refresh.');
   res.send(`
     <html>
-      <head><title>CYPHER-X - QR Login</title></head>
       <body style="text-align:center;font-family:sans-serif">
-        <h2>Scan QR Code to Login WhatsApp</h2>
-        <img src="${qrCodeBase64}" width="300" height="300" />
+        <h2>CYPHER-X Multi-User Login</h2>
+        <form method="GET" action="/qr">
+          <input name="id" placeholder="Enter your unique ID" required />
+          <button type="submit">Get QR</button>
+        </form>
+      </body>
+    </html>
+  `);
+});
+
+// Route: Show QR for specific userId
+app.get('/qr', async (req, res) => {
+  const userId = req.query.id;
+  if (!userId) return res.status(400).send('Missing ?id');
+
+  // Start new session if doesn't exist
+  if (!SESSIONS[userId]) await createSession(userId);
+
+  const qr = SESSIONS[userId].qr;
+
+  if (!qr) {
+    return res.send(`
+      <html><body style="text-align:center;font-family:sans-serif">
+        <h2>No QR Code – already logged in?</h2>
+        <p>Try sending .menu in WhatsApp to test</p>
+      </body></html>
+    `);
+  }
+
+  res.send(`
+    <html>
+      <head><title>Login WhatsApp - ${userId}</title></head>
+      <body style="text-align:center;font-family:sans-serif">
+        <h2>Scan QR Code for ${userId}</h2>
+        <img src="${qr}" width="300" height="300" />
         <p>Go to WhatsApp → Linked Devices → Scan</p>
+        <p><a href="/qr?id=${userId}">Refresh QR</a></p>
       </body>
     </html>
   `);
