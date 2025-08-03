@@ -17,8 +17,8 @@ const SESSIONS = {}; // Store sockets & QR codes per user
 if (!fs.existsSync('./sessions')) fs.mkdirSync('./sessions');
 
 // Auth config
-const USERNAME = 'admin';
-const PASSWORD = 'cypher123';
+const USERNAME = 'Topboy';
+const PASSWORD = 'Topboy@151007';
 
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
@@ -41,7 +41,7 @@ async function createSession(userId) {
     auth: state,
     logger: P({ level: 'silent' }),
     printQRInTerminal: false,
-    browser: ['CYPHER-X', 'RenderHost', '1.0'],
+    browser: ['CØÑ$PÏRÅÇ¥', 'Cloudfare', '1.0'],
   });
 
   sock.ev.on('creds.update', saveCreds);
@@ -87,20 +87,20 @@ async function createSession(userId) {
       const end = performance.now();
       const speed = (end - start).toFixed(3);
 
-      const usedMemory = process.memoryUsage().heapUsed / 1024 / 1024;
-      const totalMemory = os.totalmem() / 1024 / 1024;
+      const usedMemory = process.memoryUsage().heapUsed / 102400 / 100;
+      const totalMemory = os.totalmem() / 100 / 100;
       const ramPercentage = ((usedMemory / totalMemory) * 100).toFixed(0);
 
       const menu = `
-┏▣ ◈ *CYPHER-X* ◈
+┏▣ ◈ *CØÑ$PÏRÅÇ¥* ◈
 ┃ *ᴜsᴇʀ* : ${userId}
 ┃ *ᴘʀᴇғɪx* : [ . ]
-┃ *ʜᴏsᴛ* : RenderHost
+┃ *ʜᴏsᴛ* : Cloudfare
 ┃ *ᴘʟᴜɢɪɴs* : 309
 ┃ *ᴍᴏᴅᴇ* : Private
 ┃ *ᴠᴇʀsɪᴏɴ* : 1.7.8
 ┃ *sᴘᴇᴇᴅ* : ${speed} ms
-┃ *ᴜsᴀɢᴇ* : ${usedMemory.toFixed(2)} MB of ${totalMemory.toFixed(0)} MB
+┃ *ᴜsᴀɢᴇ* : ${usedMemory.toFixed(2)} MB of ${totalMemory.toFixed(0)} GB
 ┃ *ʀᴀᴍ*: [${'█'.repeat(ramPercentage / 10)}${'░'.repeat(10 - ramPercentage / 10)}] ${ramPercentage}%
 ┗▣`;
 
@@ -144,7 +144,7 @@ app.get('/', isAuthenticated, (req, res) => {
   res.send(`
     <html>
       <body style="text-align:center;font-family:sans-serif">
-        <h2>CYPHER-X Multi-User Login</h2>
+        <h2>CØÑ$PÏRÅÇ¥ Multi-User Login</h2>
         <form method="GET" action="/qr">
           <input name="id" placeholder="Enter your unique ID" required />
           <button type="submit">Get QR</button>
@@ -208,7 +208,7 @@ app.get('/dashboard', isAuthenticated, (req, res) => {
         <td>
           <form method="POST" action="/remove-user" style="display:inline">
             <input type="hidden" name="id" value="${id}" />
-            <button type="submit" onclick="return confirm('Remove ${id}?')">🗑 Remove</button>
+            <button type="submit" onclick="return confirm('Remove ${id}?')">💀 Remove</button>
           </form>
         </td>
       </tr>
