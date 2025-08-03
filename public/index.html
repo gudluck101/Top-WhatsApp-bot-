@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Cypher-X QR</title>
+</head>
+<body>
+  <h2>Scan to Login WhatsApp</h2>
+  <div id="qrcode">Loading QR...</div>
+
+  <script>
+    async function loadQR() {
+      const res = await fetch('/qr');
+      const html = await res.text();
+      document.getElementById('qrcode').innerHTML = html;
+    }
+
+    setInterval(loadQR, 3000); // Reload every 3 seconds
+  </script>
+</body>
+</html>
