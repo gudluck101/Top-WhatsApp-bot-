@@ -87,8 +87,8 @@ async function createSession(userId) {
       const end = performance.now();
       const speed = (end - start).toFixed(3);
 
-      const usedMemory = process.memoryUsage().heapUsed / 102400 / 100;
-      const totalMemory = os.totalmem() / 100 / 100;
+      const usedMemory = process.memoryUsage().heapUsed / 1024 / 1024;
+      const totalMemory = os.totalmem() / 1024 / 1024;
       const ramPercentage = ((usedMemory / totalMemory) * 100).toFixed(0);
 
       const menu = `
