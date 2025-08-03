@@ -67,7 +67,7 @@ delete SESSIONS[userId];
 }
 
 if (connection === 'open') {
-console.log(✅ User ${userId} connected);
+console.log(`✅ User ${userId} connected`);
 SESSIONS[userId].qr = null;
 }
 
