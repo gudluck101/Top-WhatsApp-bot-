@@ -17,8 +17,7 @@
     "node-fetch": "^2.6.7",
     "openai": "^4.30.0",
     "pino": "^8.17.0",
-    "qrcode": "^1.5.3",
-    "replit": "^4.0.0"
+    "qrcode": "^1.5.3"
   },
   "keywords": [
     "whatsapp-bot",
