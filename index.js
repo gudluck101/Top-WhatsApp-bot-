@@ -7,6 +7,7 @@ const qrcode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
 const { performance } = require('perf_hooks');
+const { askOpenAI } = require('./openai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -470,6 +471,79 @@ if (text.toLowerCase().startsWith('.menu')) {
 await sock.sendMessage(from, { text: menu }, { quoted: msg });        
 }
 
+if (command === 'ai') {
+  const args = body.trim().split(' ');
+  const sub = args[1]?.toLowerCase();
+  const input = args.slice(2).join(' ');
+
+  let prompt = '';
+
+  switch (sub) {
+    case 'az': // analyze
+      prompt = `What emotion is being expressed: "${input}"? Just reply with the emotion.`;
+      break;
+
+    case 'bb': // blackbox
+      prompt = `Write code for this task:\n${input}`;
+      break;
+
+    case 'dl': // dalle (stub)
+    case 'img':
+    case 'im':
+    case 'photoai':
+    case 'ph':
+      prompt = `Imagine and describe an image: ${input}`;
+      break;
+
+    case 'gm': // gemini
+      prompt = `Respond like Google's Gemini: ${input}`;
+      break;
+
+    case 'gn': // generate
+      prompt = `Generate creative content: ${input}`;
+      break;
+
+    case 'ds': // deepseek
+    case 'dsr1':
+      prompt = `You are DeepSeek AI. Answer or write code for:\n${input}`;
+      break;
+
+    case 'dp': // doppleai
+      prompt = `You're a friendly AI chatting casually. User says: ${input}`;
+      break;
+
+    case 'gp': // gpt
+      prompt = input;
+      break;
+
+    case 'gp2': // gpt2 style
+      prompt = `Simulate GPT-2 style response:\n${input}`;
+      break;
+
+    case 'lm': // llama
+      prompt = `You are LLaMA by Meta. Answer this:\n${input}`;
+      break;
+
+    case 'mt': // metaai
+      prompt = `Meta AI assistant reply: ${input}`;
+      break;
+
+    case 'ms': // mistral
+      prompt = `Mistral AI response:\n${input}`;
+      break;
+
+    default:
+      prompt = input;
+  }
+
+  try {
+    const reply = await askOpenAI(prompt);
+    await sock.sendMessage(from, { text: reply }, { quoted: msg });
+  } catch (err) {
+    console.error(err);
+    await sock.sendMessage(from, { text: "❌ AI failed to respond." }, { quoted: msg });
+  }
+}
 });
 
 SESSIONS[userId] = { sock, qr: null };
