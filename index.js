@@ -7,7 +7,7 @@ const qrcode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
 const { performance } = require('perf_hooks');
-const { queryHuggingFace } = require('./huggingface');
+const { askOpenAI } = require('./openai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -468,66 +468,80 @@ async function createSession(userId) {
 
       await sock.sendMessage(from, { text: menu }, { quoted: msg });
     }
+    
+if (command === 'ai') {
+  const args = body.trim().split(' ');
+  const sub = args[1]?.toLowerCase();
+  const input = args.slice(2).join(' ');
 
-    if (text.startsWith('.')) {
-  const args = text.slice(1).trim().split(/ +/);
-  const command = args.shift().toLowerCase();
-  const userInput = args.join(' ') || 'Say something!';
+  let prompt = '';
 
-  const commandMap = {
-    analyze: ['analyze', 'an'],
-    blackbox: ['blackbox', 'bb'],
-    generate: ['generate', 'gen'],
-    doppleai: ['doppleai', 'dpai']
-  };
+  switch (sub) {
+    case 'az': // analyze
+      prompt = `What emotion is being expressed: "${input}"? Just reply with the emotion.`;
+      break;
 
-  const matchedEntry = Object.entries(commandMap).find(([main, aliases]) => aliases.includes(command));
+    case 'bb': // blackbox
+      prompt = `Write code for this task:\n${input}`;
+      break;
 
-  if (matchedEntry) {
-    const [mainCommand] = matchedEntry;
+    case 'dl': // dalle (stub)
+    case 'img':
+    case 'im':
+    case 'photoai':
+    case 'ph':
+      prompt = `Imagine and describe an image: ${input}`;
+      break;
 
-    let model = '';
-let payload = {};
+    case 'gm': // gemini
+      prompt = `Respond like Google's Gemini: ${input}`;
+      break;
 
-switch (mainCommand) {
-  case 'generate':
-    model = 'gpt2';
-    payload = { inputs: userInput };
-    break;
+    case 'gn': // generate
+      prompt = `Generate creative content: ${input}`;
+      break;
 
-  case 'blackbox':
-    model = 'Salesforce/codegen-350M-multi';
-    payload = { inputs: userInput };
-    break;
+    case 'ds': // deepseek
+    case 'dsr1':
+      prompt = `You are DeepSeek AI. Answer or write code for:\n${input}`;
+      break;
 
-  case 'doppleai':
-    model = 'microsoft/DialoGPT-small';
-    payload = { inputs: userInput };
-    break;
+    case 'dp': // doppleai
+      prompt = `You're a friendly AI chatting casually. User says: ${input}`;
+      break;
 
-  case 'analyze':
-    model = 'bhadresh-savani/bert-base-uncased-emotion';
-    payload = { inputs: userInput };
-    break;
-}
+    case 'gp': // gpt
+      prompt = input;
+      break;
 
-    await sock.sendMessage(from, { text: `⏳ *${mainCommand.toUpperCase()}* running...\nInput: ${userInput}` }, { quoted: msg });
+    case 'gp2': // gpt2 style
+      prompt = `Simulate GPT-2 style response:\n${input}`;
+      break;
 
-    const result = await queryHuggingFace(model, userInput);
+    case 'lm': // llama
+      prompt = `You are LLaMA by Meta. Answer this:\n${input}`;
+      break;
 
-    // Handle various result formats
-    let output = '';
+    case 'mt': // metaai
+      prompt = `Meta AI assistant reply: ${input}`;
+      break;
 
-if (Array.isArray(result)) {
-  output = result[0]?.generated_text || result[0]?.label || JSON.stringify(result);
-} else if (typeof result === 'object') {
-  output = result?.generated_text || result?.label || JSON.stringify(result, null, 2);
-} else {
-  output = String(result);
-}
-    await sock.sendMessage(from, { text: `🤖 *${mainCommand} Result:*\n${output}` }, { quoted: msg });
+    case 'ms': // mistral
+      prompt = `Mistral AI response:\n${input}`;
+      break;
+
+    default:
+      prompt = input;
   }
-    }
+
+  try {
+    const reply = await askOpenAI(prompt);
+    await sock.sendMessage(from, { text: reply }, { quoted: msg });
+  } catch (err) {
+    console.error(err);
+    await sock.sendMessage(from, { text: "❌ AI failed to respond." }, { quoted: msg });
+  }
+}
   });
 
   SESSIONS[userId] = { sock, qr: null };
