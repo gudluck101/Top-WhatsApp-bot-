@@ -32,8 +32,9 @@ function isAuthenticated(req, res, next) {
 
 async function createSession(userId) {
   const sessionPath = path.join(__dirname, 'sessions', userId);
-  const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
-
+fs.mkdirSync(sessionPath, { recursive: true }); // ✅ Ensures folder exists
+const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
+  
   const sock = makeWASocket({
     auth: state,
     logger: P({ level: 'silent' }),
