@@ -8,6 +8,13 @@ const path = require('path');
 const fs = require('fs');
 const { performance } = require('perf_hooks');
 const { askChatGPT, generateImage } = require('./openai');
+const { OpenAI } = require("openai");
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
+module.exports = openai;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
