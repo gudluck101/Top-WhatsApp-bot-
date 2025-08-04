@@ -1,20 +1,10 @@
 {
   "name": "cypher-x-bot",
   "version": "1.0.0",
-  "description": "A WhatsApp AI bot using Baileys and OpenAI",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
-  "keywords": [
-    "whatsapp-bot",
-    "baileys",
-    "ai",
-    "openai",
-    "cypher-x"
-  ],
-  "author": "Goodluck Nwankwo",
-  "license": "MIT",
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.4",
     "axios": "^1.6.8",
@@ -23,6 +13,6 @@
     "os": "^0.1.2",
     "pino": "^8.0.0",
     "qrcode": "^1.5.1",
-    "dotenv": "^16.3.1"
+    "openai": "^4.29.0"
   }
 }
