@@ -55,13 +55,15 @@ async function createSession(userId) {
     }
 
     if (connection === 'close') {
-      const reason = lastDisconnect?.error?.output?.statusCode;
-      console.log(`User ${userId} disconnected: ${reason}`);
-      if (reason !== DisconnectReason.loggedOut) {
-        await createSession(userId);
-      } else {
-        delete SESSIONS[userId];
-      }
+  const reason = lastDisconnect?.error?.output?.statusCode;
+  console.log(`User ${userId} disconnected: ${reason}`);
+
+  if (reason !== DisconnectReason.loggedOut) {
+    console.log(`Reconnecting ${userId} in 5 seconds...`);
+    setTimeout(() => createSession(userId), 5000); // wait 5s before retrying
+  } else {
+    delete SESSIONS[userId];
+  }
     }
 
     if (connection === 'open') {
@@ -591,8 +593,12 @@ app.get('/qr', isAuthenticated, async (req, res) => {
   const userId = req.query.id;
   if (!userId) return res.status(400).send('Missing ?id');
 
-  if (!SESSIONS[userId]) await createSession(userId);
-
+  if (!SESSIONS[userId]) {
+  await createSession(userId);
+} else if (!SESSIONS[userId].sock?.user) {
+  console.log(`⚠️ Recreating broken session for ${userId}`);
+  await createSession(userId);
+}
   const qr = SESSIONS[userId].qr;
 
   if (!qr) {
