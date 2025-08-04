@@ -1,0 +1,37 @@
+const { Low } = require('lowdb');
+const { JSONFile } = require('lowdb/node');
+const path = require('path');
+
+const dbPath = path.join(__dirname, 'db.json');
+const adapter = new JSONFile(dbPath);
+const db = new Low(adapter);
+
+// Initialize default structure if not present
+async function initDB() {
+  await db.read();
+  db.data ||= { sessions: {} };
+  await db.write();
+}
+
+async function saveSession(userId, creds) {
+  await initDB();
+  db.data.sessions[userId] = creds;
+  await db.write();
+}
+
+async function loadSession(userId) {
+  await initDB();
+  return db.data.sessions[userId] || null;
+}
+
+async function deleteSession(userId) {
+  await initDB();
+  delete db.data.sessions[userId];
+  await db.write();
+}
+
+module.exports = {
+  saveSession,
+  loadSession,
+  deleteSession,
+};
