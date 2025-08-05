@@ -1,0 +1,20 @@
+<html><body>
+  <h2>Active Sessions</h2>
+  <table border="1">
+    <tr><th>User ID</th><th>Status</th><th>Action</th><th>QR/Pair</th></tr>
+    <% for (let id in sessions) { %>
+      <tr>
+        <td><%= id %></td>
+        <td><%= sessions[id].qr ? 'Awaiting QR' : 'Connected' %></td>
+        <td>
+          <form method="POST" action="/remove">
+            <input type="hidden" name="id" value="<%= id %>"/>
+            <button type="submit">Remove</button>
+          </form>
+        </td>
+        <td><a href="/qr?id=<%= id %>">View QR/Pair</a></td>
+      </tr>
+    <% } %>
+  </table>
+  <a href="/logout">Logout</a>
+</body></html>
