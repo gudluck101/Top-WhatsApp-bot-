@@ -4,7 +4,7 @@
   "description": "Multi-user WhatsApp Bot using Baileys",
   "main": "bot.js",
   "scripts": {
-    "start": "node bot.js"
+    "start": "node index.js"
   },
   "dependencies": {
     "@hapi/boom": "^10.0.0",
