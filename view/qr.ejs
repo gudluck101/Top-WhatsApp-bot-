@@ -1,0 +1,11 @@
+<html><body style="text-align:center">
+  <h2>Session: <%= userId %></h2>
+  <% if (qr) { %>
+    <img src="<%= qr %>" width="300"/><p>Scan with WhatsApp → Linked Devices</p>
+  <% } else if (pairingCode) { %>
+    <p>Use pairing code: <strong><%= pairingCode %></strong></p>
+  <% } else { %>
+    <p>No QR or Pairing Code – session may already be connected.</p>
+  <% } %>
+  <br/><a href="/dashboard">Back</a>
+</body></html>
