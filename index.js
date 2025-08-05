@@ -7,17 +7,14 @@ const qrcode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
 const { performance } = require('perf_hooks');
+const { queryHuggingFace } = require('./huggingface');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const SESSIONS = {};
 
-const SESSIONS = {}; // Active user sessions
-const SESSION_DIR = path.join(__dirname, 'sessions');
+if (!fs.existsSync('./sessions')) fs.mkdirSync('./sessions');
 
-// Create sessions directory if not exists
-if (!fs.existsSync(SESSION_DIR)) fs.mkdirSync(SESSION_DIR);
-
-// Hardcoded login credentials
 const USERNAME = 'Topboy';
 const PASSWORD = '151007';
 
@@ -34,7 +31,7 @@ function isAuthenticated(req, res, next) {
 }
 
 async function createSession(userId) {
-  const sessionPath = path.join(SESSION_DIR, userId);
+  const sessionPath = path.join(__dirname, 'sessions', userId);
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
 
   const sock = makeWASocket({
@@ -48,31 +45,22 @@ async function createSession(userId) {
 
   sock.ev.on('connection.update', async (update) => {
     const { qr, connection, lastDisconnect } = update;
-    const sessionPath = path.join(SESSION_DIR, userId);
 
     if (qr) {
       qrcode.toDataURL(qr, (err, qrData) => {
-        if (!err && SESSIONS[userId]) {
+        if (SESSIONS[userId]) {
           SESSIONS[userId].qr = qrData;
         }
       });
     }
 
     if (connection === 'close') {
-      const reason = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.message;
+      const reason = lastDisconnect?.error?.output?.statusCode;
       console.log(`User ${userId} disconnected: ${reason}`);
-
-      if (
-        reason === DisconnectReason.loggedOut ||
-        reason === 401 ||
-        /logged out/i.test(reason)
-      ) {
-        if (fs.existsSync(sessionPath)) {
-          fs.rmSync(sessionPath, { recursive: true, force: true });
-        }
-        delete SESSIONS[userId];
+      if (reason !== DisconnectReason.loggedOut) {
+        await createSession(userId);
       } else {
-        await createSession(userId); // Try reconnect
+        delete SESSIONS[userId];
       }
     }
 
@@ -84,14 +72,20 @@ async function createSession(userId) {
 
   sock.ev.on('messages.upsert', async ({ messages }) => {
     const msg = messages[0];
-    if (!msg.message || !msg.key.fromMe) return;
+    if (!msg.message) return;
 
+    const from = msg.key.remoteJid;
+    const sender = msg.key.participant || from;
+
+    const content = msg.message?.ephemeralMessage?.message || msg.message;
     const text =
-      msg.message?.conversation ||
-      msg.message?.extendedTextMessage?.text ||
-      msg.message?.imageMessage?.caption || '';
+      content?.conversation ||
+      content?.extendedTextMessage?.text ||
+      content?.imageMessage?.caption || '';
 
-    if (text && text.toLowerCase().startsWith('.menu')) {
+    if (!text) return;
+
+    if (text.toLowerCase().startsWith('.menu')) {
       const start = performance.now();
       await new Promise(r => setTimeout(r, 100));
       const end = performance.now();
@@ -113,15 +107,422 @@ async function createSession(userId) {
 ┃ sᴘᴇᴇᴅ : ${speed} ms
 ┃ ᴜsᴀɢᴇ : ${usedMemory.toFixed(2)} MB of ${totalMemory.toFixed(0)} MB
 ┃ ʀᴀᴍ: ${bar}
+┗▣
+
+┏▣ ◈  *AI MENU* ◈
+│➽ analyze
+│➽ blackbox
+│➽ dalle
+│➽ gemini
+│➽ generate
+│➽ deepseek
+│➽ deepseekr1
+│➽ doppleai
+│➽ gpt
+│➽ gpt2
+│➽ imagen
+│➽ imagine
+│➽ llama
+│➽ metaai
+│➽ mistral
+│➽ photoai
+┗▣ 
+
+┏▣ ◈  *AUDIO MENU* ◈
+│➽ bass
+│➽ blown
+│➽ deep
+│➽ earrape
+│➽ reverse
+│➽ robot
+│➽ volaudio
+│➽ tomp3
+│➽ toptt
+┗▣ 
+
+┏▣ ◈  *DOWNLOAD MENU* ◈
+│➽ apk
+│➽ download
+│➽ facebook
+│➽ gdrive
+│➽ gitclone
+│➽ image
+│➽ instagram
+│➽ itunes
+│➽ mediafire
+│➽ song
+│➽ song2
+│➽ play
+│➽ play2
+│➽ savestatus
+│➽ telesticker
+│➽ tiktok
+│➽ tiktokaudio
+│➽ twitter
+│➽ video
+│➽ videodoc
+│➽ xvideos
+│➽ ytmp3
+│➽ ytmp3doc
+│➽ ytmp4
+│➽ ytmp4doc
+┗▣ 
+
+┏▣ ◈  *EPHOTO360 MENU* ◈
+│➽ 1917style
+│➽ advancedglow
+│➽ blackpinklogo
+│➽ blackpinkstyle
+│➽ cartoonstyle
+│➽ deletingtext
+│➽ dragonball
+│➽ effectclouds
+│➽ flag3dtext
+│➽ flagtext
+│➽ freecreate
+│➽ galaxystyle
+│➽ galaxywallpaper
+│➽ glitchtext
+│➽ glowingtext
+│➽ gradienttext
+│➽ graffiti
+│➽ incandescent
+│➽ lighteffects
+│➽ logomaker
+│➽ luxurygold
+│➽ makingneon
+│➽ matrix
+│➽ multicoloredneon
+│➽ neonglitch
+│➽ papercutstyle
+│➽ pixelglitch
+│➽ royaltext
+│➽ sand
+│➽ summerbeach
+│➽ topography
+│➽ typography
+│➽ watercolortext
+│➽ writetext
+┗▣ 
+
+┏▣ ◈  *FUN MENU* ◈
+│➽ dare
+│➽ fact
+│➽ jokes
+│➽ memes
+│➽ quotes
+│➽ trivia
+│➽ truth
+│➽ truthdetector
+│➽ xxqc
+┗▣ 
+
+┏▣ ◈  *GROUP MENU* ◈
+│➽ add
+│➽ antibadword
+│➽ antibot
+│➽ antitag
+│➽ antitagadmin
+│➽ antigroupmention
+│➽ antilink
+│➽ antilinkgc
+│➽ allow
+│➽ delallowed
+│➽ listallowed
+│➽ announcements
+│➽ antidemote
+│➽ antiforeign
+│➽ addcode
+│➽ delcode
+│➽ listcode
+│➽ listactive
+│➽ listinactive
+│➽ kickinactive
+│➽ kickall
+│➽ cancelkick
+│➽ antipromote
+│➽ welcome
+│➽ approveall
+│➽ close
+│➽ delppgroup
+│➽ demote
+│➽ disapproveall
+│➽ getgrouppp
+│➽ editsettings
+│➽ link
+│➽ hidetag
+│➽ invite
+│➽ kick
+│➽ listonline
+│➽ listrequests
+│➽ mediatag
+│➽ open
+│➽ closetime
+│➽ opentime
+│➽ poll
+│➽ promote
+│➽ resetlink
+│➽ setdesc
+│➽ setgroupname
+│➽ setppgroup
+│➽ tagadmin
+│➽ tagall
+│➽ totalmembers
+│➽ userid
+│➽ vcf
+┗▣ 
+
+┏▣ ◈  *IMAGE MENU* ◈
+│➽ remini
+│➽ wallpaper
+┗▣ 
+
+┏▣ ◈  *OTHER MENU* ◈
+│➽ botstatus
+│➽ pair
+│➽ ping
+│➽ runtime
+│➽ repo
+│➽ time
+┗▣ 
+
+┏▣ ◈  *OWNER MENU* ◈
+│➽ block
+│➽ delete
+│➽ deljunk
+│➽ disk
+│➽ dlvo
+│➽ gcaddprivacy
+│➽ groupid
+│➽ hostip
+│➽ join
+│➽ lastseen
+│➽ leave
+│➽ listbadword
+│➽ listblocked
+│➽ listignorelist
+│➽ listsudo
+│➽ modestatus
+│➽ online
+│➽ owner
+│➽ ppprivacy
+│➽ react
+│➽ readreceipts
+│➽ restart
+│➽ setbio
+│➽ setprofilepic
+│➽ setstickercmd
+│➽ delstickercmd
+│➽ tostatus
+│➽ toviewonce
+│➽ unblock
+│➽ unblockall
+│➽ warn
+┗▣ 
+
+┏▣ ◈  *RELIGION MENU* ◈
+│➽ bible
+│➽ quran
+┗▣ 
+
+┏▣ ◈  *SEARCH MENU* ◈
+│➽ define
+│➽ define2
+│➽ imdb
+│➽ lyrics
+│➽ shazam
+│➽ weather
+│➽ yts
+┗▣ 
+
+┏▣ ◈  *SETTINGS MENU* ◈
+│➽ addbadword
+│➽ addignorelist
+│➽ addsudo
+│➽ alwaysonline
+│➽ antibug
+│➽ anticall
+│➽ antidelete
+│➽ antideletestatus
+│➽ antiedit
+│➽ autobio
+│➽ autoreactstatus
+│➽ autoviewstatus
+│➽ autoreact
+│➽ autoread
+│➽ autotype
+│➽ autorecord
+│➽ autorecordtyping
+│➽ autoblock
+│➽ addcountrycode
+│➽ delcountrycode
+│➽ listcountrycode
+│➽ chatbot
+│➽ deletebadword
+│➽ delignorelist
+│➽ delsudo
+│➽ mode
+│➽ setmenu
+│➽ setprefix
+│➽ setstatusemoji
+│➽ setbotname
+│➽ setownername
+│➽ setownernumber
+│➽ setwatermark
+│➽ setstickerauthor
+│➽ setstickerpackname
+│➽ settimezone
+│➽ setcontextlink
+│➽ setmenuimage
+│➽ setanticallmsg
+│➽ showanticallmsg
+│➽ delanticallmsg
+│➽ testanticallmsg
+│➽ getsettings
+│➽ resetwarn
+│➽ setwarn
+│➽ listwarn
+│➽ resetsetting
+┗▣ 
+
+┏▣ ◈  *SPORTS MENU* ◈
+│➽ clstandings
+│➽ laligastandings
+│➽ bundesligastandings
+│➽ serieastandings
+│➽ ligue1standings
+│➽ elstandings
+│➽ eflstandings
+│➽ wcstandings
+│➽ eplstandings
+│➽ eplmatches
+│➽ clmatches
+│➽ laligamatches
+│➽ bundesligamatches
+│➽ serieamatches
+│➽ ligue1matches
+│➽ elmatches
+│➽ eflmatches
+│➽ wcmatches
+│➽ eplscorers
+│➽ clscorers
+│➽ laligascorers
+│➽ bundesligascorers
+│➽ serieascorers
+│➽ ligue1scorers
+│➽ elscorers
+│➽ eflscorers
+│➽ wcscorers
+│➽ eplupcoming
+│➽ clupcoming
+│➽ laligaupcoming
+│➽ bundesligaupcoming
+│➽ serieaupcoming
+│➽ ligue1upcoming
+│➽ elupcoming
+│➽ eflupcoming
+│➽ wcupcoming
+│➽ wrestlingevents
+│➽ wwenews
+│➽ wweschedule
+┗▣ 
+
+┏▣ ◈  *SUPPORT MENU* ◈
+│➽ feedback
+│➽ helpers
+┗▣ 
+
+┏▣ ◈  *TOOLS MENU* ◈
+│➽ browse
+│➽ calculate
+│➽ getpp
+│➽ getabout
+│➽ emojimix
+│➽ fliptext
+│➽ gsmarena
+│➽ genpass
+│➽ device
+│➽ obfuscate
+│➽ filtervcf
+│➽ qrcode
+│➽ say
+│➽ ssweb
+│➽ sswebpc
+│➽ sswebtab
+│➽ sticker
+│➽ fancy
+│➽ take
+│➽ tinyurl
+│➽ toimage
+│➽ tourl
+│➽ translate
+│➽ texttopdf
+│➽ vcc
+┗▣ 
+
+┏▣ ◈  *VIDEO MENU* ◈
+│➽ volvideo
+│➽ toaudio
+│➽ tovideo
 ┗▣`;
-      await sock.sendMessage(msg.key.remoteJid, { text: menu }, { quoted: msg });
+
+      await sock.sendMessage(from, { text: menu }, { quoted: msg });
+    }
+
+    if (text.startsWith('.')) {
+  const args = text.slice(1).trim().split(/ +/);
+  const command = args.shift().toLowerCase();
+  const userInput = args.join(' ') || 'Say something!';
+
+  const commandMap = {
+    analyze: ['analyze', 'an'],
+    blackbox: ['blackbox', 'bb'],
+    generate: ['generate', 'gen'],
+    doppleai: ['doppleai', 'dpai']
+  };
+
+  const matchedEntry = Object.entries(commandMap).find(([main, aliases]) => aliases.includes(command));
+
+  if (matchedEntry) {
+    const [mainCommand] = matchedEntry;
+
+    let model, output = '...';
+
+    switch (mainCommand) {
+      case 'analyze':
+        model = 'facebook/bart-large-mnli'; // intent analysis
+        break;
+      case 'blackbox':
+        model = 'Salesforce/codet5-base'; // code gen
+        break;
+      case 'generate':
+        model = 'gpt2'; // basic free text generation
+        break;
+      case 'doppleai':
+        model = 'microsoft/DialoGPT-small'; // chatbot-style reply
+        break;
+    }
+
+    await sock.sendMessage(from, { text: `⏳ *${mainCommand.toUpperCase()}* running...\nInput: ${userInput}` }, { quoted: msg });
+
+    const result = await queryHuggingFace(model, userInput);
+
+    // Handle various result formats
+    if (Array.isArray(result)) {
+      output = result[0]?.generated_text || JSON.stringify(result);
+    } else if (typeof result === 'object') {
+      output = JSON.stringify(result, null, 2);
+    } else {
+      output = result;
+    }
+
+    await sock.sendMessage(from, { text: `🤖 *${mainCommand} Result:*\n${output}` }, { quoted: msg });
+  }
     }
   });
 
   SESSIONS[userId] = { sock, qr: null };
 }
-
-// Routes
 
 app.get('/login', (req, res) => {
   res.send(`
@@ -165,17 +566,10 @@ app.get('/', isAuthenticated, (req, res) => {
 
 app.get('/qr', isAuthenticated, async (req, res) => {
   const userId = req.query.id;
-  const reset = req.query.reset === '1';
-
   if (!userId) return res.status(400).send('Missing ?id');
 
-  const sessionPath = path.join(SESSION_DIR, userId);
-  if (reset && fs.existsSync(sessionPath)) {
-    fs.rmSync(sessionPath, { recursive: true, force: true });
-    delete SESSIONS[userId];
-  }
-
   if (!SESSIONS[userId]) await createSession(userId);
+
   const qr = SESSIONS[userId].qr;
 
   if (!qr) {
@@ -183,19 +577,21 @@ app.get('/qr', isAuthenticated, async (req, res) => {
       <html><body style="text-align:center;font-family:sans-serif">
         <h2>No QR Code – already logged in?</h2>
         <p>Try sending .menu in WhatsApp to test</p>
-        <p><a href="/qr?id=${userId}&reset=1">🔁 Reset Session</a></p>
         <a href="/dashboard">Back to Dashboard</a>
       </body></html>
     `);
   }
 
   res.send(`
-    <html><body style="text-align:center;font-family:sans-serif">
-      <h2>Scan QR Code for ${userId}</h2>
-      <img src="${qr}" width="300" height="300" />
-      <p>Go to WhatsApp → Linked Devices → Scan</p>
-      <p><a href="/qr?id=${userId}">Refresh QR</a> | <a href="/dashboard">Back</a></p>
-    </body></html>
+    <html>
+      <head><title>Login WhatsApp - ${userId}</title></head>
+      <body style="text-align:center;font-family:sans-serif">
+        <h2>Scan QR Code for ${userId}</h2>
+        <img src="${qr}" width="300" height="300" />
+        <p>Go to WhatsApp → Linked Devices → Scan</p>
+        <p><a href="/qr?id=${userId}">Refresh QR</a> | <a href="/dashboard">Back to Dashboard</a></p>
+      </body>
+    </html>
   `);
 });
 
@@ -218,11 +614,6 @@ app.get('/dashboard', isAuthenticated, (req, res) => {
             <input type="hidden" name="id" value="${id}" />
             <button type="submit" onclick="return confirm('Remove ${id}?')">💀 Remove</button>
           </form>
-          <form method="GET" action="/qr" style="display:inline">
-            <input type="hidden" name="id" value="${id}" />
-            <input type="hidden" name="reset" value="1" />
-            <button type="submit">🔁 Reset QR</button>
-          </form>
         </td>
       </tr>
     `;
@@ -239,8 +630,6 @@ app.get('/dashboard', isAuthenticated, (req, res) => {
 
 app.post('/remove-user', isAuthenticated, express.urlencoded({ extended: true }), async (req, res) => {
   const userId = req.body.id;
-  const sessionPath = path.join(SESSION_DIR, userId);
-
   if (SESSIONS[userId]) {
     try {
       await SESSIONS[userId].sock.logout();
@@ -249,11 +638,6 @@ app.post('/remove-user', isAuthenticated, express.urlencoded({ extended: true })
     }
     delete SESSIONS[userId];
   }
-
-  if (fs.existsSync(sessionPath)) {
-    fs.rmSync(sessionPath, { recursive: true, force: true });
-  }
-
   res.redirect('/dashboard');
 });
 
