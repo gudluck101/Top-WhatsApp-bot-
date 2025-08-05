@@ -12,15 +12,15 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 const SESSIONS = {}; // Active user sessions
+const SESSION_DIR = path.join(__dirname, 'sessions');
 
 // Create sessions directory if not exists
-if (!fs.existsSync('./sessions')) fs.mkdirSync('./sessions');
+if (!fs.existsSync(SESSION_DIR)) fs.mkdirSync(SESSION_DIR);
 
 // Hardcoded login credentials
 const USERNAME = 'Topboy';
-const PASSWORD = 'Topboy@151007';
+const PASSWORD = '151007';
 
-// Middleware setup
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
   secret: 'cypher-x-lock',
@@ -33,9 +33,8 @@ function isAuthenticated(req, res, next) {
   res.redirect('/login');
 }
 
-// Create a new WhatsApp session for the given user
 async function createSession(userId) {
-  const sessionPath = path.join(__dirname, 'sessions', userId);
+  const sessionPath = path.join(SESSION_DIR, userId);
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
 
   const sock = makeWASocket({
@@ -49,22 +48,31 @@ async function createSession(userId) {
 
   sock.ev.on('connection.update', async (update) => {
     const { qr, connection, lastDisconnect } = update;
+    const sessionPath = path.join(SESSION_DIR, userId);
 
     if (qr) {
       qrcode.toDataURL(qr, (err, qrData) => {
-        if (SESSIONS[userId]) {
+        if (!err && SESSIONS[userId]) {
           SESSIONS[userId].qr = qrData;
         }
       });
     }
 
     if (connection === 'close') {
-      const reason = lastDisconnect?.error?.output?.statusCode;
+      const reason = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.message;
       console.log(`User ${userId} disconnected: ${reason}`);
-      if (reason !== DisconnectReason.loggedOut) {
-        await createSession(userId); // reconnect
-      } else {
+
+      if (
+        reason === DisconnectReason.loggedOut ||
+        reason === 401 ||
+        /logged out/i.test(reason)
+      ) {
+        if (fs.existsSync(sessionPath)) {
+          fs.rmSync(sessionPath, { recursive: true, force: true });
+        }
         delete SESSIONS[userId];
+      } else {
+        await createSession(userId); // Try reconnect
       }
     }
 
@@ -92,7 +100,6 @@ async function createSession(userId) {
       const usedMemory = process.memoryUsage().heapUsed / 1024 / 1024;
       const totalMemory = os.totalmem() / 1024 / 1024;
       const ramPercentage = ((usedMemory / totalMemory) * 100).toFixed(0);
-
       const bar = `[${'█'.repeat(ramPercentage / 10)}${'░'.repeat(10 - ramPercentage / 10)}] ${ramPercentage}%`;
 
       const menu = `
@@ -106,11 +113,7 @@ async function createSession(userId) {
 ┃ sᴘᴇᴇᴅ : ${speed} ms
 ┃ ᴜsᴀɢᴇ : ${usedMemory.toFixed(2)} MB of ${totalMemory.toFixed(0)} MB
 ┃ ʀᴀᴍ: ${bar}
-┗▣
-
-> Menus omitted for brevity... (keep original menus)
-`;
-
+┗▣`;
       await sock.sendMessage(msg.key.remoteJid, { text: menu }, { quoted: msg });
     }
   });
@@ -118,7 +121,8 @@ async function createSession(userId) {
   SESSIONS[userId] = { sock, qr: null };
 }
 
-// Login page
+// Routes
+
 app.get('/login', (req, res) => {
   res.send(`
     <html><body style="text-align:center;font-family:sans-serif">
@@ -132,7 +136,6 @@ app.get('/login', (req, res) => {
   `);
 });
 
-// Handle login
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
   if (username === USERNAME && password === PASSWORD) {
@@ -142,12 +145,10 @@ app.post('/login', (req, res) => {
   res.send('Invalid credentials. <a href="/login">Try again</a>');
 });
 
-// Logout
 app.get('/logout', (req, res) => {
   req.session.destroy(() => res.redirect('/login'));
 });
 
-// Home
 app.get('/', isAuthenticated, (req, res) => {
   res.send(`
     <html><body style="text-align:center;font-family:sans-serif">
@@ -162,13 +163,19 @@ app.get('/', isAuthenticated, (req, res) => {
   `);
 });
 
-// QR Code display
 app.get('/qr', isAuthenticated, async (req, res) => {
   const userId = req.query.id;
+  const reset = req.query.reset === '1';
+
   if (!userId) return res.status(400).send('Missing ?id');
 
-  if (!SESSIONS[userId]) await createSession(userId);
+  const sessionPath = path.join(SESSION_DIR, userId);
+  if (reset && fs.existsSync(sessionPath)) {
+    fs.rmSync(sessionPath, { recursive: true, force: true });
+    delete SESSIONS[userId];
+  }
 
+  if (!SESSIONS[userId]) await createSession(userId);
   const qr = SESSIONS[userId].qr;
 
   if (!qr) {
@@ -176,25 +183,22 @@ app.get('/qr', isAuthenticated, async (req, res) => {
       <html><body style="text-align:center;font-family:sans-serif">
         <h2>No QR Code – already logged in?</h2>
         <p>Try sending .menu in WhatsApp to test</p>
+        <p><a href="/qr?id=${userId}&reset=1">🔁 Reset Session</a></p>
         <a href="/dashboard">Back to Dashboard</a>
       </body></html>
     `);
   }
 
   res.send(`
-    <html>
-      <head><title>Login WhatsApp - ${userId}</title></head>
-      <body style="text-align:center;font-family:sans-serif">
-        <h2>Scan QR Code for ${userId}</h2>
-        <img src="${qr}" width="300" height="300" />
-        <p>Go to WhatsApp → Linked Devices → Scan</p>
-        <p><a href="/qr?id=${userId}">Refresh QR</a> | <a href="/dashboard">Back to Dashboard</a></p>
-      </body>
-    </html>
+    <html><body style="text-align:center;font-family:sans-serif">
+      <h2>Scan QR Code for ${userId}</h2>
+      <img src="${qr}" width="300" height="300" />
+      <p>Go to WhatsApp → Linked Devices → Scan</p>
+      <p><a href="/qr?id=${userId}">Refresh QR</a> | <a href="/dashboard">Back</a></p>
+    </body></html>
   `);
 });
 
-// Dashboard
 app.get('/dashboard', isAuthenticated, (req, res) => {
   let html = `
     <html><body style="font-family:sans-serif">
@@ -214,6 +218,11 @@ app.get('/dashboard', isAuthenticated, (req, res) => {
             <input type="hidden" name="id" value="${id}" />
             <button type="submit" onclick="return confirm('Remove ${id}?')">💀 Remove</button>
           </form>
+          <form method="GET" action="/qr" style="display:inline">
+            <input type="hidden" name="id" value="${id}" />
+            <input type="hidden" name="reset" value="1" />
+            <button type="submit">🔁 Reset QR</button>
+          </form>
         </td>
       </tr>
     `;
@@ -228,9 +237,10 @@ app.get('/dashboard', isAuthenticated, (req, res) => {
   res.send(html);
 });
 
-// Remove session
 app.post('/remove-user', isAuthenticated, express.urlencoded({ extended: true }), async (req, res) => {
   const userId = req.body.id;
+  const sessionPath = path.join(SESSION_DIR, userId);
+
   if (SESSIONS[userId]) {
     try {
       await SESSIONS[userId].sock.logout();
@@ -239,8 +249,12 @@ app.post('/remove-user', isAuthenticated, express.urlencoded({ extended: true })
     }
     delete SESSIONS[userId];
   }
+
+  if (fs.existsSync(sessionPath)) {
+    fs.rmSync(sessionPath, { recursive: true, force: true });
+  }
+
   res.redirect('/dashboard');
 });
 
-// Start server
 app.listen(PORT, () => console.log(`✅ Server running at http://localhost:${PORT}`));
