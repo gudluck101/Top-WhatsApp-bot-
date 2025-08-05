@@ -46,27 +46,27 @@ sock.ev.on('creds.update', saveCreds);
 sock.ev.on('connection.update', async (update) => {
 const { qr, connection, lastDisconnect } = update;
 
-if (qr) {
-qrcode.toDataURL(qr, (err, qrData) => {
-if (SESSIONS[userId]) {
-SESSIONS[userId].qr = qrData;
-}
-});
-}
+if (qr) {  
+  qrcode.toDataURL(qr, (err, qrData) => {  
+    if (SESSIONS[userId]) {  
+      SESSIONS[userId].qr = qrData;  
+    }  
+  });  
+}  
 
-if (connection === 'close') {
-const reason = lastDisconnect?.error?.output?.statusCode;
-console.log(User ${userId} disconnected: ${reason});
-if (reason !== DisconnectReason.loggedOut) {
-await createSession(userId);
-} else {
-delete SESSIONS[userId];
-}
-}
+if (connection === 'close') {  
+  const reason = lastDisconnect?.error?.output?.statusCode;  
+  console.log(`User ${userId} disconnected: ${reason}`);  
+  if (reason !== DisconnectReason.loggedOut) {  
+    await createSession(userId);  
+  } else {  
+    delete SESSIONS[userId];  
+  }  
+}  
 
-if (connection === 'open') {
-console.log(✅ User ${userId} connected);
-SESSIONS[userId].qr = null;
+if (connection === 'open') {  
+  console.log(`✅ User ${userId} connected`);  
+  SESSIONS[userId].qr = null;  
 }
 
 });
@@ -75,29 +75,29 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 const msg = messages[0];
 if (!msg.message) return;
 
-const from = msg.key.remoteJid;
-const sender = msg.key.participant || from;
+const from = msg.key.remoteJid;  
+const sender = msg.key.participant || from;  
 
-const content = msg.message?.ephemeralMessage?.message || msg.message;
-const text =
-content?.conversation ||
-content?.extendedTextMessage?.text ||
-content?.imageMessage?.caption || '';
+const content = msg.message?.ephemeralMessage?.message || msg.message;  
+const text =  
+  content?.conversation ||  
+  content?.extendedTextMessage?.text ||  
+  content?.imageMessage?.caption || '';  
 
-if (!text) return;
+if (!text) return;  
 
-if (text.toLowerCase().startsWith('.menu')) {
-const start = performance.now();
-await new Promise(r => setTimeout(r, 100));
-const end = performance.now();
-const speed = (end - start).toFixed(3);
+if (text.toLowerCase().startsWith('.menu')) {  
+  const start = performance.now();  
+  await new Promise(r => setTimeout(r, 100));  
+  const end = performance.now();  
+  const speed = (end - start).toFixed(3);  
 
-const usedMemory = process.memoryUsage().heapUsed / 1024 / 1024;
-const totalMemory = os.totalmem() / 1024 / 1024;
-const ramPercentage = ((usedMemory / totalMemory) * 100).toFixed(0);
-const bar = [${'█'.repeat(ramPercentage / 10)}${'░'.repeat(10 - ramPercentage / 10)}] ${ramPercentage}%;
+  const usedMemory = process.memoryUsage().heapUsed / 1024 / 1024;  
+  const totalMemory = os.totalmem() / 1024 / 1024;  
+  const ramPercentage = ((usedMemory / totalMemory) * 100).toFixed(0);  
+  const bar = `[${'█'.repeat(ramPercentage / 10)}${'░'.repeat(10 - ramPercentage / 10)}] ${ramPercentage}%`;  
 
-const menu = `
+  const menu = `
 
 ┏▣ ◈ CØÑ$PÏRÅÇ¥ ◈
 ┃ ᴜsᴇʀ : ${userId}
@@ -468,7 +468,7 @@ const menu = `
 │➽ tovideo
 ┗▣`;
 
-await sock.sendMessage(from, { text: menu }, { quoted: msg });
+await sock.sendMessage(from, { text: menu }, { quoted: msg });  
 }
 
 if (command === 'ai') {
@@ -483,57 +483,57 @@ case 'az': // analyze
 prompt = What emotion is being expressed: "${input}"? Just reply with the emotion.;
 break;
 
-case 'bb': // blackbox
-prompt = Write code for this task:\n${input};
-break;
+case 'bb': // blackbox  
+  prompt = `Write code for this task:\n${input}`;  
+  break;  
 
-case 'dl': // dalle (stub)
-case 'img':
-case 'im':
-case 'photoai':
-case 'ph':
-prompt = Imagine and describe an image: ${input};
-break;
+case 'dl': // dalle (stub)  
+case 'img':  
+case 'im':  
+case 'photoai':  
+case 'ph':  
+  prompt = `Imagine and describe an image: ${input}`;  
+  break;  
 
-case 'gm': // gemini
-prompt = Respond like Google's Gemini: ${input};
-break;
+case 'gm': // gemini  
+  prompt = `Respond like Google's Gemini: ${input}`;  
+  break;  
 
-case 'gn': // generate
-prompt = Generate creative content: ${input};
-break;
+case 'gn': // generate  
+  prompt = `Generate creative content: ${input}`;  
+  break;  
 
-case 'ds': // deepseek
-case 'dsr1':
-prompt = You are DeepSeek AI. Answer or write code for:\n${input};
-break;
+case 'ds': // deepseek  
+case 'dsr1':  
+  prompt = `You are DeepSeek AI. Answer or write code for:\n${input}`;  
+  break;  
 
-case 'dp': // doppleai
-prompt = You're a friendly AI chatting casually. User says: ${input};
-break;
+case 'dp': // doppleai  
+  prompt = `You're a friendly AI chatting casually. User says: ${input}`;  
+  break;  
 
-case 'gp': // gpt
-prompt = input;
-break;
+case 'gp': // gpt  
+  prompt = input;  
+  break;  
 
-case 'gp2': // gpt2 style
-prompt = Simulate GPT-2 style response:\n${input};
-break;
+case 'gp2': // gpt2 style  
+  prompt = `Simulate GPT-2 style response:\n${input}`;  
+  break;  
 
-case 'lm': // llama
-prompt = You are LLaMA by Meta. Answer this:\n${input};
-break;
+case 'lm': // llama  
+  prompt = `You are LLaMA by Meta. Answer this:\n${input}`;  
+  break;  
 
-case 'mt': // metaai
-prompt = Meta AI assistant reply: ${input};
-break;
+case 'mt': // metaai  
+  prompt = `Meta AI assistant reply: ${input}`;  
+  break;  
 
-case 'ms': // mistral
-prompt = Mistral AI response:\n${input};
-break;
+case 'ms': // mistral  
+  prompt = `Mistral AI response:\n${input}`;  
+  break;  
 
-default:
-prompt = input;
+default:  
+  prompt = input;
 
 }
 
