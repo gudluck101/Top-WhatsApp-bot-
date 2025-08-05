@@ -1,5 +1,4 @@
-import {
-  default as makeWASocket,
+import makeWASocket, {
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
   makeInMemoryStore,
@@ -10,13 +9,15 @@ import fs from 'fs'
 import { join } from 'path'
 import { Boom } from '@hapi/boom'
 
+// Setup logger and store
 const logger = P({ level: 'silent' })
 const store = makeInMemoryStore({ logger })
 
-// 📦 Start session for a user by ID (e.g., phone number, UUID, etc.)
+// 📦 Start WhatsApp session for a given user/sessionId
 async function startSession(sessionId = 'default') {
   const sessionFolder = join('auth', sessionId)
 
+  // Create session folder if it doesn't exist
   if (!fs.existsSync(sessionFolder)) {
     fs.mkdirSync(sessionFolder, { recursive: true })
   }
@@ -76,9 +77,3 @@ async function startSession(sessionId = 'default') {
 
 // 👇 Start default session
 startSession('default')
-
-// 👇 Example: Start multiple users manually
-// startSession('user1')
-// startSession('user2')
-
-// Later you can automate sessionId from a database or webhook
