@@ -468,57 +468,6 @@ async function createSession(userId) {
 
       await sock.sendMessage(from, { text: menu }, { quoted: msg });
     }
-
-    if (text.startsWith('.')) {
-  const args = text.slice(1).trim().split(/ +/);
-  const command = args.shift().toLowerCase();
-  const userInput = args.join(' ') || 'Say something!';
-
-  const commandMap = {
-    analyze: ['analyze', 'an'],
-    blackbox: ['blackbox', 'bb'],
-    generate: ['generate', 'gen'],
-    doppleai: ['doppleai', 'dpai']
-  };
-
-  const matchedEntry = Object.entries(commandMap).find(([main, aliases]) => aliases.includes(command));
-
-  if (matchedEntry) {
-    const [mainCommand] = matchedEntry;
-
-    let model, output = '...';
-
-    switch (mainCommand) {
-      case 'analyze':
-        model = 'facebook/bart-large-mnli'; // intent analysis
-        break;
-      case 'blackbox':
-        model = 'Salesforce/codet5-base'; // code gen
-        break;
-      case 'generate':
-        model = 'gpt2'; // basic free text generation
-        break;
-      case 'doppleai':
-        model = 'microsoft/DialoGPT-small'; // chatbot-style reply
-        break;
-    }
-
-    await sock.sendMessage(from, { text: `⏳ *${mainCommand.toUpperCase()}* running...\nInput: ${userInput}` }, { quoted: msg });
-
-    const result = await queryHuggingFace(model, userInput);
-
-    // Handle various result formats
-    if (Array.isArray(result)) {
-      output = result[0]?.generated_text || JSON.stringify(result);
-    } else if (typeof result === 'object') {
-      output = JSON.stringify(result, null, 2);
-    } else {
-      output = result;
-    }
-
-    await sock.sendMessage(from, { text: `🤖 *${mainCommand} Result:*\n${output}` }, { quoted: msg });
-  }
-    }
   });
 
   SESSIONS[userId] = { sock, qr: null };
