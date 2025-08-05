@@ -2,9 +2,9 @@
   "name": "top-whatsapp-bot",
   "version": "1.0.0",
   "description": "Multi-user WhatsApp Bot using Baileys",
-  "main": "index.js",
+  "main": "bot.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node bot.js"
   },
   "dependencies": {
     "@hapi/boom": "^10.0.0",
