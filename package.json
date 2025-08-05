@@ -1,15 +1,14 @@
 {
-  "name": "top-whatsapp-bot",
+  "name": "cypher-x-multi",
   "version": "1.0.0",
-  "description": "Multi-user WhatsApp Bot using Baileys",
-  "main": "bot.js",
+  "type": "module",
+  "main": "index.js",
   "scripts": {
-    "start": "node bot.js"
+    "start": "node index.js"
   },
   "dependencies": {
-    "@hapi/boom": "^10.0.0",
-    "@whiskeysockets/baileys": "^6.7.1",
-    "pino": "^8.0.0"
-  },
-  "type": "module"
+    "@hapi/boom": "^11.1.4",
+    "@whiskeysockets/baileys": "^6.6.1",
+    "pino": "^8.14.1"
+  }
 }
