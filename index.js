@@ -20,6 +20,8 @@ var port = 3000;
 var session;
 const msgRetryCounterCache = new NodeCache();
 const mutex = new Mutex();
+const authenticatedUsers = {}; // 🔐 Memory-based auth store
+
 app.use(express.static(path.join(__dirname, 'static')));
 
 async function connector(Num, res) {
@@ -34,10 +36,9 @@ async function connector(Num, res) {
             creds: state.creds,
             keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'fatal' }).child({ level: 'fatal' }))
         },
-      //  printQRInTerminal: false,
         logger: pino({ level: 'fatal' }).child({ level: 'fatal' }),
-        browser: Browsers.macOS("Safari"), //check docs for more custom options
-        markOnlineOnConnect: true, //true or false yoour choice
+        browser: Browsers.macOS("Safari"),
+        markOnlineOnConnect: true,
         msgRetryCounterCache
     });
 
@@ -69,13 +70,11 @@ async function connector(Num, res) {
                 } else {
                     sID = 'Fekd up';
                 }
-              //edit this you can add ur own image in config or not ur choice
-              await session.sendMessage(session.user.id, { image: { url: `${config.IMAGE}` }, caption: `*Session ID*\n\n${sID}` }, { quoted: myr });
-            
+                await session.sendMessage(session.user.id, { image: { url: `${config.IMAGE}` }, caption: `*Session ID*\n\n${sID}` }, { quoted: myr });
+
             } catch (error) {
                 console.error('Error:', error);
             } finally {
-                //await delay(500);
                 if (fs.existsSync(path.join(__dirname, './session'))) {
                     fs.rmdirSync(path.join(__dirname, './session'), { recursive: true });
                 }
@@ -83,6 +82,63 @@ async function connector(Num, res) {
         } else if (connection === 'close') {
             var reason = lastDisconnect?.error?.output?.statusCode;
             reconn(reason);
+        }
+    });
+
+    // 🔐 Handle commands from users
+    session.ev.on('messages.upsert', async ({ messages, type }) => {
+        const msg = messages[0];
+        if (!msg.message || msg.key.fromMe) return;
+
+        const sender = msg.key.remoteJid;
+        const body = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
+
+        if (body.startsWith('.password')) {
+            const parts = body.split(' ');
+            if (parts[1] === 'Topboy123') {
+                authenticatedUsers[sender] = true;
+                await session.sendMessage(sender, { text: `✅ Authenticated. You can now use .pair` });
+            } else {
+                await session.sendMessage(sender, { text: `❌ Wrong password.` });
+            }
+        }
+
+        else if (body.startsWith('.pair')) {
+            if (!authenticatedUsers[sender]) {
+                return session.sendMessage(sender, { text: `⛔ Please authenticate first using .password` });
+            }
+
+            const phone = body.split(' ')[1];
+            if (!phone || !/^\+?\d{10,15}$/.test(phone)) {
+                return session.sendMessage(sender, { text: `⚠️ Invalid phone number.` });
+            }
+
+            try {
+                const formatted = phone.replace(/\D/g, '');
+                const { state, saveCreds } = await useMultiFileAuthState('./session');
+                const tempSock = makeWASocket({
+                    auth: {
+                        creds: state.creds,
+                        keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'fatal' }))
+                    },
+                    logger: pino({ level: 'fatal' }),
+                    browser: Browsers.macOS('Safari'),
+                    msgRetryCounterCache
+                });
+
+                await delay(1500);
+                const code = await tempSock.requestPairingCode(formatted);
+                const pairingCode = code?.match(/.{1,4}/g)?.join('-');
+                await session.sendMessage(sender, { text: `🔗 Pairing code for ${phone}:\n*${pairingCode}*` });
+
+                if (fs.existsSync(path.join(__dirname, './session'))) {
+                    fs.rmdirSync(path.join(__dirname, './session'), { recursive: true });
+                }
+
+            } catch (err) {
+                console.error(err);
+                await session.sendMessage(sender, { text: `❌ Failed to generate pairing code.` });
+            }
         }
     });
 }
@@ -102,14 +158,13 @@ app.get('/pair', async (req, res) => {
     if (!Num) {
         return res.status(418).json({ message: 'Phone number is required' });
     }
-  
-  //you can remove mutex if you dont want to queue the requests
+
     var release = await mutex.acquire();
     try {
         await connector(Num, res);
     } catch (error) {
         console.log(error);
-        res.status(500).json({ error: "fekd up"});
+        res.status(500).json({ error: "fekd up" });
     } finally {
         release();
     }
