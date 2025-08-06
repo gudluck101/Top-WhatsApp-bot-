@@ -1,11 +1,10 @@
 {
-  "name": "whatsapp-pairing-bot",
+  "name": "cypherx-whatsapp-bot",
   "version": "1.0.0",
-  "description": "WhatsApp bot that links via pairing code",
-  "main": "server.js",
+  "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "node server.js"
+    "start": "node index.js"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.1",
