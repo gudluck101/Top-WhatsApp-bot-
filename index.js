@@ -13,15 +13,17 @@ const Boom = require('@hapi/boom');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Serve static frontend
+app.use(express.static('public'));
+app.use(express.json());
+
 const SESSION_FILE = 'session.json';
 if (!fs.existsSync(SESSION_FILE)) fs.writeFileSync(SESSION_FILE, '{}');
 const sessionData = JSON.parse(fs.readFileSync(SESSION_FILE));
 const pairingCodes = {}; // Store pairing codes temporarily for frontend access
 
-app.use(express.json());
-
 // ✅ Health check
-app.get('/', (req, res) => res.send('🤖 CypherX Bot is running!'));
+app.get('/api', (req, res) => res.send('🤖 CypherX Bot is running!'));
 
 // ✅ API: Get pairing code
 app.get('/pair/:phone', async (req, res) => {
@@ -124,7 +126,7 @@ async function startBot(sessionId = 'cypher-main') {
         });
 
         const code = await generatePairingCode(pairSock, cleanPhone);
-        pairingCodes[cleanPhone] = code; // Store for frontend too
+        pairingCodes[cleanPhone] = code;
 
         await sock.sendMessage(sender, {
           text: `🔗 *Pairing Code for ${cleanPhone}:*\n\n*${code}*\n\nOpen WhatsApp → Linked Devices → Enter Code`,
