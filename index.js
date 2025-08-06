@@ -1,64 +1,120 @@
-import express from 'express'
-import makeWASocket, {
-  useMultiFileAuthState,
-  fetchLatestBaileysVersion,
-  DisconnectReason,
-  makeInMemoryStore,
-  generatePairingCode
-} from '@whiskeysockets/baileys'
-import P from 'pino'
-import fs from 'fs'
-import path from 'path'
-import { fileURLToPath } from 'url'
-import qrcode from 'qrcode'
+const express = require('express');
+const fs = require('fs');
+const pino = require('pino');
+const NodeCache = require('node-cache');
+const {
+    default: makeWASocket,
+    useMultiFileAuthState,
+    delay,
+    Browsers,
+    makeCacheableSignalKeyStore,
+    DisconnectReason
+} = require('baileys');
+const { upload } = require('./mega');
+const { Mutex } = require('async-mutex');
+const config = require('./config');
+const path = require('path');
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+var app = express();
+var port = 3000;
+var session;
+const msgRetryCounterCache = new NodeCache();
+const mutex = new Mutex();
+app.use(express.static(path.join(__dirname, 'static')));
 
-const app = express()
-const PORT = process.env.PORT || 10000
-
-app.use(express.static(path.join(__dirname, 'public')))
-app.use(express.json())
-
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/index.html'))
-})
-
-app.post('/pair', async (req, res) => {
-  const { number } = req.body
-  if (!number) return res.status(400).send('Phone number is required')
-
-  const { state, saveCreds } = await useMultiFileAuthState('auth')
-  const { version } = await fetchLatestBaileysVersion()
-
-  const sock = makeWASocket({
-    version,
-    auth: state,
-    logger: P({ level: 'silent' }),
-    printQRInTerminal: false
-  })
-
-  try {
-    const code = await generatePairingCode(sock, number)
-    const qrImage = await qrcode.toDataURL(code)
-    res.send(`<img src="${qrImage}" /><br><p>Scan this code with your WhatsApp</p>`)
-  } catch (err) {
-    console.error(err)
-    res.status(500).send('Failed to generate pairing code')
-  }
-
-  sock.ev.on('creds.update', saveCreds)
-  sock.ev.on('connection.update', ({ connection, lastDisconnect }) => {
-    if (connection === 'close') {
-      const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
-      if (shouldReconnect) startBot()
-    } else if (connection === 'open') {
-      console.log('✅ Connected successfully')
+async function connector(Num, res) {
+    var sessionDir = './session';
+    if (!fs.existsSync(sessionDir)) {
+        fs.mkdirSync(sessionDir);
     }
-  })
-})
+    var { state, saveCreds } = await useMultiFileAuthState(sessionDir);
 
-app.listen(PORT, () => {
-  console.log(`✅ CypherX WhatsApp Bot Running at http://localhost:${PORT}`)
-})
+    session = makeWASocket({
+        auth: {
+            creds: state.creds,
+            keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'fatal' }).child({ level: 'fatal' }))
+        },
+      //  printQRInTerminal: false,
+        logger: pino({ level: 'fatal' }).child({ level: 'fatal' }),
+        browser: Browsers.macOS("Safari"), //check docs for more custom options
+        markOnlineOnConnect: true, //true or false yoour choice
+        msgRetryCounterCache
+    });
+
+    if (!session.authState.creds.registered) {
+        await delay(1500);
+        Num = Num.replace(/[^0-9]/g, '');
+        var code = await session.requestPairingCode(Num);
+        if (!res.headersSent) {
+            res.send({ code: code?.match(/.{1,4}/g)?.join('-') });
+        }
+    }
+
+    session.ev.on('creds.update', async () => {
+        await saveCreds();
+    });
+
+    session.ev.on('connection.update', async (update) => {
+        var { connection, lastDisconnect } = update;
+        if (connection === 'open') {
+            console.log('Connected successfully');
+            await delay(5000);
+            var myr = await session.sendMessage(session.user.id, { text: `${config.MESSAGE}` });
+            var pth = './session/creds.json';
+            try {
+                var url = await upload(pth);
+                var sID;
+                if (url.includes("https://mega.nz/file/")) {
+                    sID = config.PREFIX + url.split("https://mega.nz/file/")[1];
+                } else {
+                    sID = 'Fekd up';
+                }
+              //edit this you can add ur own image in config or not ur choice
+              await session.sendMessage(session.user.id, { image: { url: `${config.IMAGE}` }, caption: `*Session ID*\n\n${sID}` }, { quoted: myr });
+            
+            } catch (error) {
+                console.error('Error:', error);
+            } finally {
+                //await delay(500);
+                if (fs.existsSync(path.join(__dirname, './session'))) {
+                    fs.rmdirSync(path.join(__dirname, './session'), { recursive: true });
+                }
+            }
+        } else if (connection === 'close') {
+            var reason = lastDisconnect?.error?.output?.statusCode;
+            reconn(reason);
+        }
+    });
+}
+
+function reconn(reason) {
+    if ([DisconnectReason.connectionLost, DisconnectReason.connectionClosed, DisconnectReason.restartRequired].includes(reason)) {
+        console.log('Connection lost, reconnecting...');
+        connector();
+    } else {
+        console.log(`Disconnected! reason: ${reason}`);
+        session.end();
+    }
+}
+
+app.get('/pair', async (req, res) => {
+    var Num = req.query.code;
+    if (!Num) {
+        return res.status(418).json({ message: 'Phone number is required' });
+    }
+  
+  //you can remove mutex if you dont want to queue the requests
+    var release = await mutex.acquire();
+    try {
+        await connector(Num, res);
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ error: "fekd up"});
+    } finally {
+        release();
+    }
+});
+
+app.listen(port, () => {
+    console.log(`Running on PORT:${port}`);
+});
