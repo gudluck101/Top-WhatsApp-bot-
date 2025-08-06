@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CypherX WhatsApp Pairing</title>
+</head>
+<body style="font-family: sans-serif; padding: 2rem;">
+  <h1>🤖 CypherX Bot – WhatsApp Pairing</h1>
+  <p>Enter your phone number (e.g. <code>+2349012345678</code>) to get a WhatsApp pairing code.</p>
+
+  <input type="text" id="phone" placeholder="Enter phone number" style="padding: 0.5rem; width: 250px;" />
+  <button onclick="getPairingCode()" style="padding: 0.5rem;">Get Code</button>
+
+  <div id="result" style="margin-top: 1.5rem; white-space: pre-wrap;"></div>
+
+  <script>
+    async function getPairingCode() {
+      const phone = document.getElementById('phone').value.trim();
+      const resultDiv = document.getElementById('result');
+      resultDiv.textContent = '⏳ Fetching pairing code...';
+
+      try {
+        const res = await fetch(`/pair/${encodeURIComponent(phone)}`);
+        const data = await res.json();
+
+        if (data.error) {
+          resultDiv.textContent = `❌ Error: ${data.error}`;
+        } else {
+          resultDiv.innerHTML = `
+✅ Pairing code for <b>${data.phone}</b>:
+<pre style="font-size: 1.5rem;">${data.code}</pre>
+📲 Open WhatsApp → Linked Devices → Enter the above code.
+          `;
+        }
+      } catch (err) {
+        resultDiv.textContent = `❌ Failed to fetch code: ${err.message}`;
+      }
+    }
+  </script>
+</body>
+</html>
