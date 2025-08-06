@@ -10,20 +10,51 @@ const fs = require('fs');
 const P = require('pino');
 const express = require('express');
 const Boom = require('@hapi/boom');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ✅ Simple health check
-app.get('/', (req, res) => res.send('🤖 CypherX Bot is running!'));
-app.listen(PORT, () => console.log(`🚀 Server started on port ${PORT}`));
-
-// ✅ Ensure session store exists
 const SESSION_FILE = 'session.json';
 if (!fs.existsSync(SESSION_FILE)) fs.writeFileSync(SESSION_FILE, '{}');
 const sessionData = JSON.parse(fs.readFileSync(SESSION_FILE));
+const pairingCodes = {}; // Store pairing codes temporarily for frontend access
 
-// ✅ Bot Start Function
+app.use(express.json());
+
+// ✅ Health check
+app.get('/', (req, res) => res.send('🤖 CypherX Bot is running!'));
+
+// ✅ API: Get pairing code
+app.get('/pair/:phone', async (req, res) => {
+  const phone = req.params.phone.replace(/[^0-9]/g, '');
+  if (!phone) return res.status(400).json({ error: 'Phone number required' });
+
+  const sessionFolder = `auth/${phone}`;
+  if (!fs.existsSync(sessionFolder)) fs.mkdirSync(sessionFolder, { recursive: true });
+
+  try {
+    const { state: pairState, saveCreds: savePairCreds } = await useMultiFileAuthState(sessionFolder);
+    const pairSock = makeWASocket({
+      auth: pairState,
+      logger: P({ level: 'silent' }),
+      browser: ['CypherX-Frontend', 'Chrome', '2.0.0'],
+    });
+
+    const code = await generatePairingCode(pairSock, phone);
+    pairingCodes[phone] = code;
+
+    pairSock.ev.on('creds.update', savePairCreds);
+
+    return res.json({
+      phone,
+      code,
+      message: 'Use this code in WhatsApp → Linked Devices → Enter Code',
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ Start WhatsApp bot
 async function startBot(sessionId = 'cypher-main') {
   const { state, saveCreds } = await useMultiFileAuthState(`auth/${sessionId}`);
   const { version } = await fetchLatestBaileysVersion();
@@ -31,18 +62,18 @@ async function startBot(sessionId = 'cypher-main') {
   const sock = makeWASocket({
     version,
     logger: P({ level: 'silent' }),
-    printQRInTerminal: true,
+    printQRInTerminal: false,
     auth: state,
     browser: ['CypherX', 'Chrome', '1.0.0'],
   });
 
+  // ✅ Message handler
   sock.ev.on('messages.upsert', async ({ messages }) => {
     const msg = messages[0];
     if (!msg.message || msg.key.fromMe) return;
 
     const sender = msg.key.remoteJid;
-    const text =
-      msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+    const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
 
     if (text.startsWith('.menu')) {
       return sock.sendMessage(sender, {
@@ -52,10 +83,9 @@ async function startBot(sessionId = 'cypher-main') {
 
     if (text.startsWith('.auth')) {
       const inputPass = text.split(' ')[1];
-      if (!inputPass)
-        return sock.sendMessage(sender, {
-          text: '❌ Usage: `.auth cypherpass`',
-        });
+      if (!inputPass) {
+        return sock.sendMessage(sender, { text: '❌ Usage: `.auth cypherpass`' });
+      }
 
       if (inputPass === 'cypherpass') {
         sessionData[sender] = true;
@@ -93,9 +123,11 @@ async function startBot(sessionId = 'cypher-main') {
           browser: ['CypherX-Bot', 'Firefox', '2.0.0'],
         });
 
-        const code = await generatePairingCode(pairSock, phone);
+        const code = await generatePairingCode(pairSock, cleanPhone);
+        pairingCodes[cleanPhone] = code; // Store for frontend too
+
         await sock.sendMessage(sender, {
-          text: `🔗 *Pairing Code for ${phone}:*\n\n*${code}*\n\nOpen WhatsApp → Linked Devices → Enter Code`,
+          text: `🔗 *Pairing Code for ${cleanPhone}:*\n\n*${code}*\n\nOpen WhatsApp → Linked Devices → Enter Code`,
         });
 
         pairSock.ev.on('creds.update', savePairCreds);
@@ -107,6 +139,7 @@ async function startBot(sessionId = 'cypher-main') {
     }
   });
 
+  // ✅ Connection updates
   sock.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect } = update;
     if (connection === 'close') {
@@ -125,5 +158,6 @@ async function startBot(sessionId = 'cypher-main') {
   sock.ev.on('creds.update', saveCreds);
 }
 
-// 🚀 Launch bot
+// 🚀 Start the bot and server
 startBot();
+app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
