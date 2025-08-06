@@ -1,26 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>WhatsApp Bot Pairing</title>
+  <meta charset="UTF-8">
+  <title>CypherX WhatsApp Bot</title>
 </head>
 <body>
-  <h2>🤖 CypherX WhatsApp Bot</h2>
-  <input type="text" id="number" placeholder="e.g. +2349012345678" />
-  <button onclick="getCode()">Get Pairing Code</button>
-  <pre id="codeDisplay"></pre>
-
-  <script>
-    async function getCode() {
-      const number = document.getElementById('number').value
-      const res = await fetch('/get-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ number })
-      })
-      const data = await res.json()
-      document.getElementById('codeDisplay').innerText = data.code || data.error
-    }
-  </script>
+  <h1>🤖 CypherX WhatsApp Bot</h1>
+  <form action="/pair" method="GET">
+    <input type="text" name="phone" placeholder="+2348142672374" required>
+    <button type="submit">Get Pairing Code</button>
+  </form>
 </body>
 </html>
