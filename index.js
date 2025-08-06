@@ -1,165 +1,77 @@
-const {
-  default: makeWASocket,
+import express from 'express'
+import path from 'path'
+import { fileURLToPath } from 'url'
+import {
+  default as makeWASocket,
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
-  DisconnectReason,
+  makeInMemoryStore,
   generatePairingCode,
-} = require('@whiskeysockets/baileys');
+} from '@whiskeysockets/baileys'
+import P from 'pino'
+import fs from 'fs'
 
-const fs = require('fs');
-const P = require('pino');
-const express = require('express');
-const Boom = require('@hapi/boom');
-const app = express();
-const PORT = process.env.PORT || 3000;
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
-// Serve static frontend
-app.use(express.static('public'));
-app.use(express.json());
+const app = express()
+const PORT = process.env.PORT || 3000
 
-const SESSION_FILE = 'session.json';
-if (!fs.existsSync(SESSION_FILE)) fs.writeFileSync(SESSION_FILE, '{}');
-const sessionData = JSON.parse(fs.readFileSync(SESSION_FILE));
-const pairingCodes = {}; // Store pairing codes temporarily for frontend access
+// Middleware
+app.use(express.json())
+app.use(express.static(path.join(__dirname, 'public')))
 
-// ✅ Health check
-app.get('/api', (req, res) => res.send('🤖 CypherX Bot is running!'));
+// Serve frontend
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'))
+})
 
-// ✅ API: Get pairing code
-app.get('/pair/:phone', async (req, res) => {
-  const phone = req.params.phone.replace(/[^0-9]/g, '');
-  if (!phone) return res.status(400).json({ error: 'Phone number required' });
-
-  const sessionFolder = `auth/${phone}`;
-  if (!fs.existsSync(sessionFolder)) fs.mkdirSync(sessionFolder, { recursive: true });
+// Pairing code endpoint
+app.post('/get-code', async (req, res) => {
+  const { number } = req.body
+  if (!number) return res.status(400).json({ error: 'Phone number is required' })
 
   try {
-    const { state: pairState, saveCreds: savePairCreds } = await useMultiFileAuthState(sessionFolder);
-    const pairSock = makeWASocket({
-      auth: pairState,
-      logger: P({ level: 'silent' }),
-      browser: ['CypherX-Frontend', 'Chrome', '2.0.0'],
-    });
-
-    const code = await generatePairingCode(pairSock, phone);
-    pairingCodes[phone] = code;
-
-    pairSock.ev.on('creds.update', savePairCreds);
-
-    return res.json({
-      phone,
-      code,
-      message: 'Use this code in WhatsApp → Linked Devices → Enter Code',
-    });
+    const code = await startBot(number)
+    res.json({ code })
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    console.error('Error generating code:', err)
+    res.status(500).json({ error: 'Failed to generate pairing code' })
   }
-});
+})
 
-// ✅ Start WhatsApp bot
-async function startBot(sessionId = 'cypher-main') {
-  const { state, saveCreds } = await useMultiFileAuthState(`auth/${sessionId}`);
-  const { version } = await fetchLatestBaileysVersion();
+// Start the Express server
+app.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}`)
+})
+
+// Start bot logic
+async function startBot(phoneNumber) {
+  const { state, saveCreds } = await useMultiFileAuthState('auth')
+  const { version } = await fetchLatestBaileysVersion()
+  const store = makeInMemoryStore({
+    logger: P({ level: 'silent' }).child({ stream: 'store' }),
+  })
 
   const sock = makeWASocket({
     version,
-    logger: P({ level: 'silent' }),
-    printQRInTerminal: false,
     auth: state,
-    browser: ['CypherX', 'Chrome', '1.0.0'],
-  });
+    logger: P({ level: 'silent' }),
+    browser: ['CypherX-Bot', 'Chrome', '1.0.0'],
+    printQRInTerminal: false,
+  })
 
-  // ✅ Message handler
-  sock.ev.on('messages.upsert', async ({ messages }) => {
-    const msg = messages[0];
-    if (!msg.message || msg.key.fromMe) return;
+  store.bind(sock.ev)
 
-    const sender = msg.key.remoteJid;
-    const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+  if (!sock.authState.creds.registered) {
+    const code = await generatePairingCode(sock, phoneNumber)
+    if (!code) throw new Error('Could not get pairing code')
+    console.log('Generated pairing code:', code)
+    return code
+  } else {
+    console.log('Already paired')
+    return '✅ Already connected'
+  }
 
-    if (text.startsWith('.menu')) {
-      return sock.sendMessage(sender, {
-        text: `🤖 *CypherX Bot Menu*\n\n🔐 .auth [password]\n🔗 .pair [phone]\n📜 .menu`,
-      });
-    }
-
-    if (text.startsWith('.auth')) {
-      const inputPass = text.split(' ')[1];
-      if (!inputPass) {
-        return sock.sendMessage(sender, { text: '❌ Usage: `.auth cypherpass`' });
-      }
-
-      if (inputPass === 'cypherpass') {
-        sessionData[sender] = true;
-        fs.writeFileSync(SESSION_FILE, JSON.stringify(sessionData));
-        return sock.sendMessage(sender, {
-          text: '✅ Auth successful. Now send `.pair +234xxxxxxx`',
-        });
-      } else {
-        return sock.sendMessage(sender, { text: '❌ Wrong password.' });
-      }
-    }
-
-    if (text.startsWith('.pair')) {
-      if (!sessionData[sender]) {
-        return sock.sendMessage(sender, {
-          text: '❌ Not authorized. Use `.auth cypherpass` first.',
-        });
-      }
-
-      const phone = text.split(' ')[1];
-      if (!phone)
-        return sock.sendMessage(sender, {
-          text: '❌ Provide phone: `.pair +234xxxxxxxx`',
-        });
-
-      const cleanPhone = phone.replace(/[^0-9]/g, '');
-      const sessionFolder = `auth/${cleanPhone}`;
-      if (!fs.existsSync(sessionFolder)) fs.mkdirSync(sessionFolder, { recursive: true });
-
-      try {
-        const { state: pairState, saveCreds: savePairCreds } = await useMultiFileAuthState(sessionFolder);
-        const pairSock = makeWASocket({
-          auth: pairState,
-          logger: P({ level: 'silent' }),
-          browser: ['CypherX-Bot', 'Firefox', '2.0.0'],
-        });
-
-        const code = await generatePairingCode(pairSock, cleanPhone);
-        pairingCodes[cleanPhone] = code;
-
-        await sock.sendMessage(sender, {
-          text: `🔗 *Pairing Code for ${cleanPhone}:*\n\n*${code}*\n\nOpen WhatsApp → Linked Devices → Enter Code`,
-        });
-
-        pairSock.ev.on('creds.update', savePairCreds);
-      } catch (err) {
-        await sock.sendMessage(sender, {
-          text: `❌ Error generating code: ${err.message}`,
-        });
-      }
-    }
-  });
-
-  // ✅ Connection updates
-  sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect } = update;
-    if (connection === 'close') {
-      const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
-      if (reason !== DisconnectReason.loggedOut) {
-        console.log('🔁 Reconnecting...');
-        startBot();
-      } else {
-        console.log('📴 Bot logged out.');
-      }
-    } else if (connection === 'open') {
-      console.log('✅ Bot connected.');
-    }
-  });
-
-  sock.ev.on('creds.update', saveCreds);
+  sock.ev.on('creds.update', saveCreds)
 }
-
-// 🚀 Start the bot and server
-startBot();
-app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
