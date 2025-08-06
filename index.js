@@ -18,12 +18,12 @@ const PORT = process.env.PORT || 3000;
 app.get('/', (req, res) => res.send('🤖 CypherX Bot is running!'));
 app.listen(PORT, () => console.log(`🚀 Server started on port ${PORT}`));
 
-// ✅ Session storage file for auth
+// ✅ Ensure session store exists
 const SESSION_FILE = 'session.json';
 if (!fs.existsSync(SESSION_FILE)) fs.writeFileSync(SESSION_FILE, '{}');
 const sessionData = JSON.parse(fs.readFileSync(SESSION_FILE));
 
-// ✅ Start bot
+// ✅ Bot Start Function
 async function startBot(sessionId = 'cypher-main') {
   const { state, saveCreds } = await useMultiFileAuthState(`auth/${sessionId}`);
   const { version } = await fetchLatestBaileysVersion();
@@ -31,12 +31,11 @@ async function startBot(sessionId = 'cypher-main') {
   const sock = makeWASocket({
     version,
     logger: P({ level: 'silent' }),
-    printQRInTerminal: true, // Main account QR shown in terminal
+    printQRInTerminal: true,
     auth: state,
     browser: ['CypherX', 'Chrome', '1.0.0'],
   });
 
-  // ✅ Handle incoming messages
   sock.ev.on('messages.upsert', async ({ messages }) => {
     const msg = messages[0];
     if (!msg.message || msg.key.fromMe) return;
@@ -45,14 +44,12 @@ async function startBot(sessionId = 'cypher-main') {
     const text =
       msg.message.conversation || msg.message.extendedTextMessage?.text || '';
 
-    // 🔘 Menu command
     if (text.startsWith('.menu')) {
       return sock.sendMessage(sender, {
         text: `🤖 *CypherX Bot Menu*\n\n🔐 .auth [password]\n🔗 .pair [phone]\n📜 .menu`,
       });
     }
 
-    // 🔐 Auth command
     if (text.startsWith('.auth')) {
       const inputPass = text.split(' ')[1];
       if (!inputPass)
@@ -71,7 +68,6 @@ async function startBot(sessionId = 'cypher-main') {
       }
     }
 
-    // 🔗 Pair command
     if (text.startsWith('.pair')) {
       if (!sessionData[sender]) {
         return sock.sendMessage(sender, {
@@ -111,7 +107,6 @@ async function startBot(sessionId = 'cypher-main') {
     }
   });
 
-  // 🔁 Auto reconnect
   sock.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect } = update;
     if (connection === 'close') {
@@ -127,9 +122,8 @@ async function startBot(sessionId = 'cypher-main') {
     }
   });
 
-  // ✅ Save credentials on change
   sock.ev.on('creds.update', saveCreds);
 }
 
-// 🚀 Launch
+// 🚀 Launch bot
 startBot();
