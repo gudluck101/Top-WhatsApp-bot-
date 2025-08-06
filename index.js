@@ -3,7 +3,6 @@ const {
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
   DisconnectReason,
-  makeInMemoryStore,
   generatePairingCode,
 } = require('@whiskeysockets/baileys');
 
@@ -20,8 +19,6 @@ const SESSION_FILE = 'session.json';
 if (!fs.existsSync(SESSION_FILE)) fs.writeFileSync(SESSION_FILE, '{}');
 const sessionData = JSON.parse(fs.readFileSync(SESSION_FILE));
 
-const store = makeInMemoryStore({ logger: P().child({ level: 'silent', stream: 'store' }) });
-
 async function startBot(sessionId = 'cypher-main') {
   const { state, saveCreds } = await useMultiFileAuthState(`auth/${sessionId}`);
   const { version } = await fetchLatestBaileysVersion();
@@ -33,8 +30,6 @@ async function startBot(sessionId = 'cypher-main') {
     auth: state,
     browser: ['CypherX', 'Safari', '1.0.0'],
   });
-
-  store.bind(sock.ev);
 
   sock.ev.on('messages.upsert', async ({ messages }) => {
     const msg = messages[0];
@@ -76,6 +71,7 @@ async function startBot(sessionId = 'cypher-main') {
       const { state: pairState, saveCreds: savePairCreds } = await useMultiFileAuthState(sessionFolder);
       const pairSock = makeWASocket({
         auth: pairState,
+        logger: P({ level: 'silent' }),
         browser: ['CypherX-Bot', 'Chrome', '10.0'],
       });
 
@@ -95,7 +91,7 @@ async function startBot(sessionId = 'cypher-main') {
   sock.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect } = update;
     if (connection === 'close') {
-      const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
+      const reason = lastDisconnect?.error?.output?.statusCode;
       if (reason !== DisconnectReason.loggedOut) {
         console.log('Reconnecting...');
         startBot();
