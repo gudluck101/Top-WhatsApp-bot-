@@ -1,8 +1,4 @@
-import makeWASocket, {
-  useMultiFileAuthState,
-  fetchLatestBaileysVersion
-} from '@whiskeysockets/baileys'
-
+import { default as makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } from '@whiskeysockets/baileys'
 import express from 'express'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -10,18 +6,15 @@ import { fileURLToPath } from 'url'
 const app = express()
 const PORT = process.env.PORT || 10000
 
-// Setup __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// Serve the frontend
 app.use(express.static(path.join(__dirname, 'public')))
 
 let sockGlobal = null
 
 async function startBot(phoneNumber) {
   const { state, saveCreds } = await useMultiFileAuthState('auth_info')
-
   const { version } = await fetchLatestBaileysVersion()
 
   const sock = makeWASocket({
@@ -36,7 +29,7 @@ async function startBot(phoneNumber) {
   if (!sock.authState.creds.registered) {
     try {
       const code = await sock.requestPairingCode(phoneNumber)
-      console.log('✅ Pairing Code for', phoneNumber, ':', code)
+      console.log('✅ Pairing code for', phoneNumber, ':', code)
     } catch (err) {
       console.error('❌ Error generating pairing code:', err)
     }
@@ -45,11 +38,14 @@ async function startBot(phoneNumber) {
 
 app.get('/pair', async (req, res) => {
   const { phone } = req.query
-  if (!phone) return res.status(400).send('Phone number missing')
+  if (!phone) return res.status(400).send('Phone number is missing.')
 
   try {
     await startBot(phone)
-    res.send('✅ Pairing code has been logged in the console. Check Render logs.')
+    res.send(`
+      <h2>✅ Pairing code has been generated.</h2>
+      <p>Check your Render.com Logs to copy the code.</p>
+    `)
   } catch (err) {
     console.error(err)
     res.status(500).send('❌ Failed to generate pairing code.')
