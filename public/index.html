@@ -3,59 +3,25 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>CypherX WhatsApp Pairing</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      max-width: 600px;
-      margin: 2rem auto;
-      padding: 1rem;
-    }
-    input {
-      padding: 0.5rem;
-      width: 250px;
-    }
-    button {
-      padding: 0.5rem;
-    }
-    #result {
-      margin-top: 1.5rem;
-      white-space: pre-wrap;
-      font-size: 1.2rem;
-    }
-  </style>
+  <title>WhatsApp Bot Pairing</title>
 </head>
 <body>
-  <h1>🤖 CypherX Bot – WhatsApp Pairing</h1>
-  <p>Enter your phone number (e.g. <code>+2349012345678</code>)</p>
-
-  <input type="text" id="phone" placeholder="Enter phone number" />
-  <button onclick="getPairingCode()">Get Pairing Code</button>
-
-  <div id="result"></div>
+  <h2>🤖 CypherX Bot – WhatsApp Pairing</h2>
+  <input type="text" id="number" placeholder="Enter your phone number e.g. +2349012345678" />
+  <button onclick="getCode()">Get Pairing Code</button>
+  <pre id="codeDisplay"></pre>
 
   <script>
-    async function getPairingCode() {
-      const phone = document.getElementById('phone').value.trim();
-      const resultDiv = document.getElementById('result');
-      resultDiv.textContent = '⏳ Fetching pairing code...';
+    async function getCode() {
+      const number = document.getElementById('number').value
+      const res = await fetch('/get-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ number })
+      })
 
-      try {
-        const res = await fetch(`/pair/${encodeURIComponent(phone)}`);
-        const data = await res.json();
-
-        if (data.error) {
-          resultDiv.textContent = `❌ Error: ${data.error}`;
-        } else {
-          resultDiv.innerHTML = `
-✅ Pairing code for <b>${data.phone}</b>:
-<pre style="font-size: 1.5rem;">${data.code}</pre>
-📲 Open WhatsApp → Linked Devices → Enter the code above.
-          `;
-        }
-      } catch (err) {
-        resultDiv.textContent = `❌ Failed to fetch code: ${err.message}`;
-      }
+      const data = await res.json()
+      document.getElementById('codeDisplay').innerText = data.code || data.error
     }
   </script>
 </body>
