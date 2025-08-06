@@ -1,15 +1,28 @@
 {
-  "name": "top-whatsapp-bot",
+  "name": "pair",
   "version": "1.0.0",
-  "type": "module",
+  "description": "simple pairing code example",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "pm2 start index.js --name pair-example",
+    "stop": "pm2 stop pair-example",
+    "restart": "pm2 restart pair-example",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/IRON-M4N/pair-example.git"
+  },
+  "keywords": [],
+  "author": "IRON-M4N",
+  "license": "MIT",
   "dependencies": {
-    "@whiskeysockets/baileys": "^6.6.0",
-    "express": "^4.18.2",
-    "pino": "^8.17.0",
-    "qrcode": "^1.5.1"
+    "baileys": "git+https://github.com/WhiskeySockets/Baileys.git",
+    "async-mutex": "^0.5.0",
+    "express": "^4.21.1",
+    "megajs": "*",
+    "node-cache": "^5.1.2",
+    "pino": "^9.4.0",
+    "pm2": "^5.4.2"
   }
 }
