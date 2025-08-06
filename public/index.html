@@ -4,15 +4,35 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>CypherX WhatsApp Pairing</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 600px;
+      margin: 2rem auto;
+      padding: 1rem;
+    }
+    input {
+      padding: 0.5rem;
+      width: 250px;
+    }
+    button {
+      padding: 0.5rem;
+    }
+    #result {
+      margin-top: 1.5rem;
+      white-space: pre-wrap;
+      font-size: 1.2rem;
+    }
+  </style>
 </head>
-<body style="font-family: sans-serif; padding: 2rem;">
+<body>
   <h1>🤖 CypherX Bot – WhatsApp Pairing</h1>
-  <p>Enter your phone number (e.g. <code>+2349012345678</code>) to get a WhatsApp pairing code.</p>
+  <p>Enter your phone number (e.g. <code>+2349012345678</code>)</p>
 
-  <input type="text" id="phone" placeholder="Enter phone number" style="padding: 0.5rem; width: 250px;" />
-  <button onclick="getPairingCode()" style="padding: 0.5rem;">Get Code</button>
+  <input type="text" id="phone" placeholder="Enter phone number" />
+  <button onclick="getPairingCode()">Get Pairing Code</button>
 
-  <div id="result" style="margin-top: 1.5rem; white-space: pre-wrap;"></div>
+  <div id="result"></div>
 
   <script>
     async function getPairingCode() {
@@ -30,7 +50,7 @@
           resultDiv.innerHTML = `
 ✅ Pairing code for <b>${data.phone}</b>:
 <pre style="font-size: 1.5rem;">${data.code}</pre>
-📲 Open WhatsApp → Linked Devices → Enter the above code.
+📲 Open WhatsApp → Linked Devices → Enter the code above.
           `;
         }
       } catch (err) {
